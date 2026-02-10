@@ -1,6 +1,13 @@
-name: Terraform Snowflake - Manual (Plan + Apply)
+name: CI Terraform Snowflake (DEV/STG/PROD)
 
 on:
+  pull_request:
+    paths:
+      - "terraform/snowflake/**"
+  push:
+    branches: ["main"]
+    paths:
+      - "terraform/snowflake/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -8,6 +15,14 @@ on:
         type: choice
         required: true
         options: [dev, stg, prod]
+      mode:
+        description: "Execution mode"
+        type: choice
+        required: true
+        options:
+          - plan
+          - apply_destroy
+          - apply
 
 permissions:
   contents: read
@@ -37,6 +52,32 @@ jobs:
         with:
           terraform_version: 1.7.5
 
+      # -----------------------------
+      # Select env folder + mode
+      # - PR: plan on dev
+      # - push main: apply on dev (auto)
+      # - manual: chosen env/mode
+      # -----------------------------
+      - name: Select environment directory
+        id: envdir
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+            MODE="${{ github.event.inputs.mode }}"
+            echo "dir=terraform/snowflake/envs/$ENV" >> $GITHUB_OUTPUT
+            echo "mode=$MODE" >> $GITHUB_OUTPUT
+          else
+            echo "dir=terraform/snowflake/envs/dev" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+              echo "mode=apply" >> $GITHUB_OUTPUT
+            else
+              echo "mode=plan" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      # -----------------------------
+      # Safety check: ensure TF vars exist (don't print values)
+      # -----------------------------
       - name: Check required TF vars are present
         run: |
           test -n "${TF_VAR_snowflake_organization_name}" || (echo "Missing SNOWFLAKE_ORGANIZATION_NAME" && exit 1)
@@ -44,7 +85,11 @@ jobs:
           test -n "${TF_VAR_snowflake_username}"          || (echo "Missing SNOWFLAKE_USERNAME" && exit 1)
           test -n "${TF_VAR_snowflake_password}"          || (echo "Missing SNOWFLAKE_PASSWORD" && exit 1)
           test -n "${TF_VAR_svc_dbt_password}"            || (echo "Missing SVC_DBT_PASSWORD" && exit 1)
+          echo "OK: required TF vars present"
 
+      # -----------------------------
+      # Terraform fmt (auto) + fail if diff
+      # -----------------------------
       - name: Terraform fmt (auto)
         run: terraform fmt -recursive terraform/snowflake
 
@@ -53,18 +98,61 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             echo "Terraform files were not formatted."
             echo "Please run locally: terraform fmt -recursive terraform/snowflake"
+            echo "Diff:"
             git --no-pager diff
             exit 1
           fi
 
-      - name: Terraform init (no backend for now)
-        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} init -backend=false
+      # -----------------------------
+      # Terraform init with retry
+      # - plan/apply_destroy: backend=false (no GCS needed)
+      # - apply: backend normal (if configured)
+      # -----------------------------
+      - name: Terraform init (retry)
+        run: |
+          set -e
+          CHDIR="${{ steps.envdir.outputs.dir }}"
+          MODE="${{ steps.envdir.outputs.mode }}"
+
+          if [ "$MODE" = "apply" ]; then
+            INIT_CMD="terraform -chdir=$CHDIR init"
+          else
+            INIT_CMD="terraform -chdir=$CHDIR init -backend=false"
+          fi
+
+          echo "Running: $INIT_CMD"
+
+          for i in 1 2 3; do
+            if eval "$INIT_CMD"; then
+              exit 0
+            fi
+            echo "Init failed (attempt $i). Retrying..."
+            sleep 5
+          done
+
+          echo "Terraform init failed after retries."
+          exit 1
 
       - name: Terraform validate
-        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} validate
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} validate
 
       - name: Terraform plan
-        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} plan -out=tfplan
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} plan -out=tfplan
 
-      - name: Terraform apply
-        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} apply -auto-approve tfplan
+      # -----------------------------
+      # apply_destroy: test apply then cleanup
+      # -----------------------------
+      - name: Terraform apply (test)
+        if: steps.envdir.outputs.mode == 'apply_destroy'
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
+
+      - name: Terraform destroy (cleanup)
+        if: steps.envdir.outputs.mode == 'apply_destroy'
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} destroy -auto-approve
+
+      # -----------------------------
+      # apply: auto on push main (DEV) + manual apply when selected
+      # -----------------------------
+      - name: Terraform apply (real)
+        if: steps.envdir.outputs.mode == 'apply'
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
