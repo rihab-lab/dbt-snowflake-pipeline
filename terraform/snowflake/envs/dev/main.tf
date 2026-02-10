@@ -4,7 +4,7 @@ module "snowflake_env" {
   env            = "DEV"
   db_name_prefix = "MYDATA"
 
-  schemas         = ["RAW", "BRONZE", "SILVER", "GOLD"]
+  schemas          = ["RAW", "BRONZE", "SILVER", "GOLD"]
   readonly_schemas = ["SILVER", "GOLD"]
 
   warehouse_size                 = "SMALL"
