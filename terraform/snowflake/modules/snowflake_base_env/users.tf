@@ -11,7 +11,9 @@ resource "snowflake_user" "svc_dbt" {
   password = var.svc_dbt_password
 }
 
-resource "snowflake_role_grants" "grant_role_dbt_to_user" {
-  role_name = snowflake_role.role_dbt.name
-  users     = [snowflake_user.svc_dbt.name]
+
+# Grant ROLE_DBT_<ENV> to the user
+resource "snowflake_grant_account_role" "grant_dbt_role_to_user" {
+  role_name = snowflake_account_role.role_dbt.name
+  user_name = snowflake_user.svc_dbt.name
 }
