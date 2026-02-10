@@ -1,0 +1,77 @@
+name: Terraform Snowflake (DEV/STG/PROD)
+
+on:
+  pull_request:
+    paths:
+      - "terraform/snowflake/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options:
+          - dev
+          - stg
+          - prod
+      action:
+        description: "Terraform action"
+        type: choice
+        required: true
+        options:
+          - plan
+          - apply
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    # Permet d'utiliser les protections d'environnement GitHub (approbation pour prod)
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+      TF_VAR_snowflake_account:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      TF_VAR_snowflake_username: ${{ secrets.SNOWFLAKE_USERNAME }}
+      TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      TF_VAR_svc_dbt_password:   ${{ secrets.SVC_DBT_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Select env folder
+        id: envdir
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "dir=terraform/snowflake/envs/${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            # PR -> par défaut on plan DEV (tu peux changer pour stg aussi si tu veux)
+            echo "dir=terraform/snowflake/envs/dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} init
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} validate
+
+      - name: Terraform plan
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} plan -out=tfplan
+
+      - name: Terraform apply (manual only)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'apply'
+        run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
