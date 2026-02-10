@@ -20,9 +20,9 @@ on:
         type: choice
         required: true
         options:
-          - plan          # safe (no backend)
-          - apply_destroy # test apply then cleanup (no backend)
-          - apply         # real apply (uses backend if configured)
+          - plan
+          - apply_destroy
+          - apply
 
 permissions:
   contents: read
@@ -35,7 +35,6 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
-      # Variables Terraform injectées depuis GitHub Secrets
       TF_VAR_snowflake_account:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
       TF_VAR_snowflake_username: ${{ secrets.SNOWFLAKE_USERNAME }}
       TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
@@ -50,27 +49,19 @@ jobs:
         with:
           terraform_version: 1.7.5
 
-      # -----------------------------
-      # Select env folder + mode
-      # PR => plan sur dev
-      # push main => plan sur dev
-      # workflow_dispatch => env/mode choisi
-      # -----------------------------
       - name: Select environment directory
         id: envdir
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "dir=terraform/snowflake/envs/${{ inputs.environment }}" >> $GITHUB_OUTPUT
-            echo "mode=${{ inputs.mode }}" >> $GITHUB_OUTPUT
+            ENV="${{ github.event.inputs.environment }}"
+            MODE="${{ github.event.inputs.mode }}"
+            echo "dir=terraform/snowflake/envs/$ENV" >> $GITHUB_OUTPUT
+            echo "mode=$MODE" >> $GITHUB_OUTPUT
           else
             echo "dir=terraform/snowflake/envs/dev" >> $GITHUB_OUTPUT
             echo "mode=plan" >> $GITHUB_OUTPUT
           fi
 
-      # -----------------------------
-      # FMT (auto) + fail si diff
-      # => tu dois commit le fmt une fois, après c'est clean
-      # -----------------------------
       - name: Terraform fmt (auto)
         run: terraform fmt -recursive terraform/snowflake
 
@@ -84,11 +75,6 @@ jobs:
             exit 1
           fi
 
-      # -----------------------------
-      # Terraform init avec retry
-      # - plan/apply_destroy => backend=false (test sans GCS)
-      # - apply => backend normal (quand tu activeras un backend remote)
-      # -----------------------------
       - name: Terraform init (retry)
         run: |
           set -e
@@ -120,9 +106,6 @@ jobs:
       - name: Terraform plan
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} plan -out=tfplan
 
-      # -----------------------------
-      # apply_destroy = test complet + cleanup
-      # -----------------------------
       - name: Terraform apply (test)
         if: steps.envdir.outputs.mode == 'apply_destroy'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
@@ -131,9 +114,6 @@ jobs:
         if: steps.envdir.outputs.mode == 'apply_destroy'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} destroy -auto-approve
 
-      # -----------------------------
-      # apply = vrai apply (manuel conseillé)
-      # -----------------------------
       - name: Terraform apply (real)
         if: github.event_name == 'workflow_dispatch' && steps.envdir.outputs.mode == 'apply'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
