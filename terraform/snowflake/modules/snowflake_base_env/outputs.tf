@@ -7,11 +7,11 @@ output "warehouse_dbt_name" {
 }
 
 output "role_dbt_name" {
-  value = snowflake_role.role_dbt.name
+  value = snowflake_account_role.role_dbt.name
 }
 
 output "role_readonly_name" {
-  value = var.create_readonly_role ? snowflake_role.role_readonly[0].name : null
+  value = var.create_readonly_role ? snowflake_account_role.role_readonly[0].name : null
 }
 
 output "svc_dbt_user_name" {
