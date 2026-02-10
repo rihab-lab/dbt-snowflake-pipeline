@@ -35,8 +35,10 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
+      # Terraform vars from GitHub Secrets
       TF_VAR_snowflake_organization_name: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}
       TF_VAR_snowflake_account_name:      ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
+
       TF_VAR_snowflake_username: ${{ secrets.SNOWFLAKE_USERNAME }}
       TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
       TF_VAR_svc_dbt_password:   ${{ secrets.SVC_DBT_PASSWORD }}
@@ -50,6 +52,12 @@ jobs:
         with:
           terraform_version: 1.7.5
 
+      # -----------------------------
+      # Select env folder + mode
+      # - PR: plan on dev
+      # - push main: apply on dev (auto)
+      # - manual: chosen env/mode
+      # -----------------------------
       - name: Select environment directory
         id: envdir
         run: |
@@ -60,9 +68,28 @@ jobs:
             echo "mode=$MODE" >> $GITHUB_OUTPUT
           else
             echo "dir=terraform/snowflake/envs/dev" >> $GITHUB_OUTPUT
-            echo "mode=plan" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+              echo "mode=apply" >> $GITHUB_OUTPUT
+            else
+              echo "mode=plan" >> $GITHUB_OUTPUT
+            fi
           fi
 
+      # -----------------------------
+      # Safety check: ensure TF vars exist (don't print values)
+      # -----------------------------
+      - name: Check required TF vars are present
+        run: |
+          test -n "${TF_VAR_snowflake_organization_name}" || (echo "Missing SNOWFLAKE_ORGANIZATION_NAME" && exit 1)
+          test -n "${TF_VAR_snowflake_account_name}"      || (echo "Missing SNOWFLAKE_ACCOUNT_NAME" && exit 1)
+          test -n "${TF_VAR_snowflake_username}"          || (echo "Missing SNOWFLAKE_USERNAME" && exit 1)
+          test -n "${TF_VAR_snowflake_password}"          || (echo "Missing SNOWFLAKE_PASSWORD" && exit 1)
+          test -n "${TF_VAR_svc_dbt_password}"            || (echo "Missing SVC_DBT_PASSWORD" && exit 1)
+          echo "OK: required TF vars present"
+
+      # -----------------------------
+      # Terraform fmt (auto) + fail if diff
+      # -----------------------------
       - name: Terraform fmt (auto)
         run: terraform fmt -recursive terraform/snowflake
 
@@ -76,6 +103,11 @@ jobs:
             exit 1
           fi
 
+      # -----------------------------
+      # Terraform init with retry
+      # - plan/apply_destroy: backend=false (no GCS needed)
+      # - apply: backend normal (if configured)
+      # -----------------------------
       - name: Terraform init (retry)
         run: |
           set -e
@@ -107,6 +139,9 @@ jobs:
       - name: Terraform plan
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} plan -out=tfplan
 
+      # -----------------------------
+      # apply_destroy: test apply then cleanup
+      # -----------------------------
       - name: Terraform apply (test)
         if: steps.envdir.outputs.mode == 'apply_destroy'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
@@ -115,6 +150,9 @@ jobs:
         if: steps.envdir.outputs.mode == 'apply_destroy'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} destroy -auto-approve
 
+      # -----------------------------
+      # apply: auto on push main (DEV) + manual apply when selected
+      # -----------------------------
       - name: Terraform apply (real)
-        if: github.event_name == 'workflow_dispatch' && steps.envdir.outputs.mode == 'apply'
+        if: steps.envdir.outputs.mode == 'apply'
         run: terraform -chdir=${{ steps.envdir.outputs.dir }} apply -auto-approve tfplan
