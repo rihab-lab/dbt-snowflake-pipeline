@@ -22,8 +22,9 @@ jobs:
       TF_INPUT: "false"
 
       # Variables communes (depuis GitHub secrets)
-      TF_VAR_org_id:             ${{ secrets.TF_VAR_ORG_ID }}
-      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+      TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
+      TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
+      TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
     steps:
       - uses: actions/checkout@v4
