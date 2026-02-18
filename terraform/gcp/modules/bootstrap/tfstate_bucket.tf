@@ -9,3 +9,15 @@ resource "google_storage_bucket" "tfstate" {
     enabled = true
   }
 }
+
+resource "google_storage_bucket_iam_member" "tfstate_object_admin" {
+  bucket = google_storage_bucket.tfstate.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.ci.email}"
+}
+
+resource "google_storage_bucket_iam_member" "tfstate_bucket_reader" {
+  bucket = google_storage_bucket.tfstate.name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${google_service_account.ci.email}"
+}
