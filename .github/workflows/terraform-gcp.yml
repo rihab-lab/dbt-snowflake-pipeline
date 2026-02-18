@@ -1,36 +1,48 @@
-name: Terraform GCP - Create Projects
+name: Terraform GCP - Create Project (DEV/STG/PROD)
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: [dev, stg, prod]
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  create_projects:
+  create_project:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      # Variables communes (depuis GitHub secrets)
+      TF_VAR_org_id:             ${{ secrets.TF_VAR_ORG_ID }}
+      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.5
 
-      # 🔐 OIDC Authentication
       - name: Authenticate to GCP via OIDC
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      - name: Terraform Init
-        run: terraform -chdir=terraform/gcp/org_projects init
+      - name: Terraform init
+        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} init
 
-      - name: Terraform Apply
-        run: terraform -chdir=terraform/gcp/org_projects apply -auto-approve \
-             -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}" \
-             -var="org_id=${{ secrets.TF_VAR_ORG_ID }}"
+      - name: Terraform plan
+        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} plan -out=tfplan
+
+      - name: Terraform apply
+        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} apply -auto-approve tfplan
