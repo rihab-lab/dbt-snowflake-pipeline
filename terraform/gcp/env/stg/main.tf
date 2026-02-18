@@ -3,7 +3,9 @@ module "project" {
   org_id             = var.org_id
   billing_account_id = var.billing_account_id
 
-  project_id = "snowdbt-stg"
+  # au lieu de project_id
+  project_prefix = "snowdbt"
+  environments   = ["stg"]
 
   labels = {
     environment = "stg"
