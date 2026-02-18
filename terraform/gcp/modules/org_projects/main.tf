@@ -1,27 +1,20 @@
 locals {
-  projects = {
-    for env in var.environments :
-    env => "${var.project_prefix}-${env}"
-  }
+  envs = toset(var.environments)
 }
 
-resource "google_project" "env" {
-  for_each   = local.projects
+resource "google_project" "projects" {
+  for_each            = local.envs
 
-  project_id = each.value
-  name       = each.value
-
-  org_id = var.org_id
+  project_id          = "${var.project_prefix}-${each.value}"
+  name                = "${var.project_prefix}-${each.value}"
+  org_id              = var.org_id
+  billing_account     = var.billing_account_id
 
   labels = merge(
     var.labels,
-    { environment = each.key }
+    {
+      environment = each.value
+      managed_by  = "terraform"
+    }
   )
-}
-
-# Attach billing to each created project
-resource "google_project_billing_info" "billing" {
-  for_each        = google_project.env
-  project         = each.value.project_id
-  billing_account = var.billing_account_id
 }
