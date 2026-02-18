@@ -32,3 +32,5 @@ jobs:
 
       - name: Terraform Apply
         run: terraform -chdir=terraform/gcp/org_projects apply -auto-approve
+             -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}" \
+             -var="org_id=${{ secrets.TF_VAR_ORG_ID }}"
