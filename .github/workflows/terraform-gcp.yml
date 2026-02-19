@@ -1,30 +1,33 @@
-name: Terraform GCP - Create Project (DEV/STG/PROD)
+name: Terraform GCP - org_projects
 
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Target environment"
+      mode:
+        description: "plan ou apply"
         type: choice
         required: true
-        options: [dev, stg, prod]
+        options: [plan, apply]
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  create_project:
+  org_projects:
     runs-on: ubuntu-latest
 
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
-      # Variables communes (depuis GitHub secrets)
+      # ✅ variables Terraform (attention: minuscules après TF_VAR_)
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
       TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
       TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+
+      # ✅ bucket backend
+      TFSTATE_BUCKET: "tfstate-bootstrap-project-48771"
 
     steps:
       - uses: actions/checkout@v4
@@ -39,11 +42,18 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      - name: Terraform init
-        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} init
+      - name: Terraform init (GCS backend)
+        run: |
+          terraform -chdir=terraform/gcp/org_projects init \
+            -backend-config="bucket=${TFSTATE_BUCKET}" \
+            -backend-config="prefix=gcp/org_projects"
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform/gcp/org_projects validate
 
       - name: Terraform plan
-        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} plan -out=tfplan
+        run: terraform -chdir=terraform/gcp/org_projects plan -out=tfplan
 
       - name: Terraform apply
-        run: terraform -chdir=terraform/gcp/env/${{ github.event.inputs.environment }} apply -auto-approve tfplan
+        if: ${{ github.event.inputs.mode == 'apply' }}
+        run: terraform -chdir=terraform/gcp/org_projects apply -auto-approve tfplan

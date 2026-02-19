@@ -1,11 +1,16 @@
 variable "bootstrap_project_id" {
   type        = string
-  description = "Project where Terraform runs (bootstrap project)"
+  description = "Bootstrap project used to run Terraform (quota/billing project)"
 }
 
-variable "org_id" { type = string }
+variable "org_id" {
+  type = string
+}
 
-variable "billing_account_id" { type = string }
+variable "billing_account_id" {
+  type        = string
+  description = "Billing account id like XXXXXX-XXXXXX-XXXXXX"
+}
 
 variable "project_prefix" {
   type    = string

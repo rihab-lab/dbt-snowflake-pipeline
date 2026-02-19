@@ -1,7 +1,9 @@
-variable "org_id" { type = string }
+variable "org_id" {
+  type = string
+}
 
 variable "billing_account_id" {
-  type = string
+  type        = string
   description = "Billing account id like XXXXXX-XXXXXX-XXXXXX"
 }
 

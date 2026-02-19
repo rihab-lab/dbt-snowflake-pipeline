@@ -1,19 +1,22 @@
 locals {
-  envs = toset(var.environments)
+  projects = {
+    for env in var.environments :
+    env => "${var.project_prefix}-${env}"
+  }
 }
 
-resource "google_project" "projects" {
-  for_each            = local.envs
+resource "google_project" "project" {
+  for_each = local.projects
 
-  project_id          = "${var.project_prefix}-${each.value}"
-  name                = "${var.project_prefix}-${each.value}"
-  org_id              = var.org_id
-  billing_account     = var.billing_account_id
+  project_id      = each.value
+  name            = each.value
+  org_id          = var.org_id
+  billing_account = var.billing_account_id
 
   labels = merge(
     var.labels,
     {
-      environment = each.value
+      environment = each.key
       managed_by  = "terraform"
     }
   )
