@@ -25,7 +25,7 @@ jobs:
       TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
       TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
-      TFSTATE_BUCKET: "tfstate-bootstrap-project-48771"
+      TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
 
     steps:
       - uses: actions/checkout@v4
