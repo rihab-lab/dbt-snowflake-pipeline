@@ -1,8 +1,13 @@
-name: Terraform GCP - org_projects
+name: Terraform GCP - Env (DEV/STG/PROD)
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: [dev, stg, prod]
       mode:
         description: "plan ou apply"
         type: choice
@@ -14,19 +19,19 @@ permissions:
   id-token: write
 
 jobs:
-  org_projects:
+  terraform_env:
     runs-on: ubuntu-latest
 
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
-      # ✅ variables Terraform (attention: minuscules après TF_VAR_)
+      # ✅ Terraform vars (minuscule après TF_VAR_)
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
       TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
       TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
-      # ✅ bucket backend
+      # ✅ backend bucket
       TFSTATE_BUCKET: "tfstate-bootstrap-project-48771"
 
     steps:
@@ -42,18 +47,25 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
+      - name: Select env directory + state prefix
+        id: sel
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "dir=terraform/gcp/env/$ENV" >> $GITHUB_OUTPUT
+          echo "prefix=gcp/env/$ENV" >> $GITHUB_OUTPUT
+
       - name: Terraform init (GCS backend)
         run: |
-          terraform -chdir=terraform/gcp/org_projects init \
+          terraform -chdir=${{ steps.sel.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
-            -backend-config="prefix=gcp/org_projects"
+            -backend-config="prefix=${{ steps.sel.outputs.prefix }}"
 
       - name: Terraform validate
-        run: terraform -chdir=terraform/gcp/org_projects validate
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
 
       - name: Terraform plan
-        run: terraform -chdir=terraform/gcp/org_projects plan -out=tfplan
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
 
       - name: Terraform apply
         if: ${{ github.event.inputs.mode == 'apply' }}
-        run: terraform -chdir=terraform/gcp/org_projects apply -auto-approve tfplan
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve tfplan
