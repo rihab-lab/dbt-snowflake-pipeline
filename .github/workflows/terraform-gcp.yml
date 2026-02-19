@@ -1,4 +1,4 @@
-name: Terraform GCP - Env (DEV/STG/PROD)
+name: Terraform GCP - Env (Auto Plan + Apply)
 
 on:
   workflow_dispatch:
@@ -8,11 +8,6 @@ on:
         type: choice
         required: true
         options: [dev, stg, prod]
-      mode:
-        description: "plan ou apply"
-        type: choice
-        required: true
-        options: [plan, apply]
 
 permissions:
   contents: read
@@ -26,12 +21,10 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
-      # ✅ Terraform vars (minuscule après TF_VAR_)
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
       TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
       TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
-      # ✅ backend bucket
       TFSTATE_BUCKET: "tfstate-bootstrap-project-48771"
 
     steps:
@@ -47,14 +40,14 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      - name: Select env directory + state prefix
+      - name: Select env directory
         id: sel
         run: |
           ENV="${{ github.event.inputs.environment }}"
           echo "dir=terraform/gcp/env/$ENV" >> $GITHUB_OUTPUT
           echo "prefix=gcp/env/$ENV" >> $GITHUB_OUTPUT
 
-      - name: Terraform init (GCS backend)
+      - name: Terraform init
         run: |
           terraform -chdir=${{ steps.sel.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
@@ -67,5 +60,4 @@ jobs:
         run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
 
       - name: Terraform apply
-        if: ${{ github.event.inputs.mode == 'apply' }}
         run: terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve tfplan
