@@ -4,10 +4,10 @@ module "project" {
   billing_account_id = var.billing_account_id
 
   project_prefix = "snowdbt"
-  environments   = ["dev"]
+  environments   = ["prod"]
 
   labels = {
-    environment = "dev"
+    environment = "prod"
     managed_by  = "terraform"
   }
 }
