@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # IMPORTANT pour WIF
+  id-token: write   # nécessaire pour WIF
 
 jobs:
   terraform:
@@ -31,8 +31,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ✅ Auth GCP pour le backend GCS
-      - name: Auth to Google Cloud (WIF)
+      # 🔐 Auth GCP pour backend GCS
+      - name: Authenticate to Google Cloud (WIF)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
@@ -43,7 +43,7 @@ jobs:
         with:
           terraform_version: 1.7.5
 
-      - name: Check required TF vars are present
+      - name: Check required TF vars
         run: |
           test -n "${TF_VAR_snowflake_organization_name}" || (echo "Missing SNOWFLAKE_ORGANIZATION_NAME" && exit 1)
           test -n "${TF_VAR_snowflake_account_name}"      || (echo "Missing SNOWFLAKE_ACCOUNT_NAME" && exit 1)
@@ -51,19 +51,11 @@ jobs:
           test -n "${TF_VAR_snowflake_password}"          || (echo "Missing SNOWFLAKE_PASSWORD" && exit 1)
           test -n "${TF_VAR_svc_dbt_password}"            || (echo "Missing SVC_DBT_PASSWORD" && exit 1)
 
-      - name: Terraform fmt (auto)
-        run: terraform fmt -recursive terraform/snowflake
+      # ✅ FMT CHECK (ne modifie rien, échoue si non formaté)
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive terraform/snowflake
 
-      - name: Fail if formatting changed files
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "Terraform files were not formatted."
-            echo "Please run locally: terraform fmt -recursive terraform/snowflake"
-            git --no-pager diff
-            exit 1
-          fi
-
-      - name: Terraform init (with backend)
+      - name: Terraform init
         run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} init
 
       - name: Terraform validate
