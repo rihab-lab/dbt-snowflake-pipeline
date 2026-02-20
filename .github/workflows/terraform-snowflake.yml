@@ -36,7 +36,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_TERRAFORM_SA_EMAIL }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
