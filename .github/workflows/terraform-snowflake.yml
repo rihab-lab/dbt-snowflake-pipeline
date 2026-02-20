@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # IMPORTANT pour WIF
 
 jobs:
   terraform:
@@ -29,6 +30,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ✅ Auth GCP pour le backend GCS
+      - name: Auth to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA_EMAIL }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
