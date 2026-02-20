@@ -81,3 +81,22 @@ resource "google_billing_account_iam_member" "ci_billing_user" {
   depends_on = [google_service_account.ci]
 }
 
+# --- Bootstrap project permissions needed by Terraform runs (quota/billing project) ---
+
+# Allow the CI SA to "use" the bootstrap project for API calls (fixes USER_PROJECT_DENIED / serviceusage.services.use)
+resource "google_project_iam_member" "ci_service_usage_consumer" {
+  project = var.bootstrap_project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+
+  depends_on = [google_service_account.ci]
+}
+
+# Allow the CI SA to manage objects in the TF state bucket (or manage GCS in bootstrap project)
+resource "google_project_iam_member" "ci_storage_admin" {
+  project = var.bootstrap_project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+
+  depends_on = [google_service_account.ci]
+}

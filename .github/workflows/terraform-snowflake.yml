@@ -20,13 +20,11 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
-      # Terraform vars from GitHub Secrets
       TF_VAR_snowflake_organization_name: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}
       TF_VAR_snowflake_account_name:      ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
-
-      TF_VAR_snowflake_username: ${{ secrets.SNOWFLAKE_USERNAME }}
-      TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      TF_VAR_svc_dbt_password:   ${{ secrets.SVC_DBT_PASSWORD }}
+      TF_VAR_snowflake_username:          ${{ secrets.SNOWFLAKE_USERNAME }}
+      TF_VAR_snowflake_password:          ${{ secrets.SNOWFLAKE_PASSWORD }}
+      TF_VAR_svc_dbt_password:            ${{ secrets.SVC_DBT_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -57,8 +55,8 @@ jobs:
             exit 1
           fi
 
-      - name: Terraform init (no backend for now)
-        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} init -backend=false
+      - name: Terraform init (with backend)
+        run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} init
 
       - name: Terraform validate
         run: terraform -chdir=terraform/snowflake/envs/${{ github.event.inputs.environment }} validate
