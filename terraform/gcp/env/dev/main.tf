@@ -61,19 +61,33 @@ resource "google_storage_bucket_iam_member" "landing_admin" {
 
   depends_on = [google_storage_bucket.landing]
 }
+#to be addded storage.bucketViewer
+resource "google_storage_bucket_iam_member" "landing_viewer" {
+  bucket = google_storage_bucket.landing.name
+  role   = "roles/storage.bucketViewer"
+  member = "user:rihab.bahri7@rbaapp.com"
 
+  depends_on = [google_storage_bucket.landing]
+}
 #to be addded storage.bucketViewer
 resource "google_storage_bucket_iam_member" "archive_admin" {
   bucket = google_storage_bucket.archive.name
   role   = "roles/storage.objectAdmin"
   member = "user:rihab.bahri7@rbaapp.com"
 
-  depends_on = [google_storage_bucket.landing]
+  depends_on = [google_storage_bucket.archive]
+}
+resource "google_storage_bucket_iam_member" "archive_viewer" {
+  bucket = google_storage_bucket.archive.name
+  role   = "roles/storage.objectAdmin"
+  member = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_storage_bucket.archive]
 }
 #composer
-# ----------------------------------------
-# APIs requises
-# ----------------------------------------
+# ------------------------------------------------------------
+# APIs requises (Composer + dépendances)
+# ------------------------------------------------------------
 resource "google_project_service" "apis" {
   for_each = toset([
     "composer.googleapis.com",
@@ -92,10 +106,10 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# ----------------------------------------
-# Cloud Composer 2 Service Agent permissions
-# (obligatoire pour créer l'env)
-# ----------------------------------------
+# ------------------------------------------------------------
+# Cloud Composer 2 - Service Agent Extension role (OBLIGATOIRE)
+# service-<PROJECT_NUMBER>@cloudcomposer-accounts.iam.gserviceaccount.com
+# ------------------------------------------------------------
 resource "google_project_iam_member" "composer_service_agent_v2ext" {
   project = local.project_id
   role    = "roles/composer.ServiceAgentV2Ext"
@@ -104,15 +118,32 @@ resource "google_project_iam_member" "composer_service_agent_v2ext" {
   depends_on = [google_project_service.apis]
 }
 
-# Attendre la propagation IAM (évite le 400 failedPrecondition)
+# ------------------------------------------------------------
+# Google APIs Service Account - souvent requis pour Composer
+# <PROJECT_NUMBER>@cloudservices.gserviceaccount.com
+# ------------------------------------------------------------
+resource "google_project_iam_member" "cloudservices_editor" {
+  project = local.project_id
+  role    = "roles/editor"
+  member  = "serviceAccount:${module.project.project_numbers["dev"]}@cloudservices.gserviceaccount.com"
+
+  depends_on = [google_project_service.apis]
+}
+
+# ------------------------------------------------------------
+# Attendre propagation IAM (évite les erreurs 400 "missing perms")
+# ------------------------------------------------------------
 resource "time_sleep" "wait_composer_iam" {
-  depends_on      = [google_project_iam_member.composer_service_agent_v2ext]
+  depends_on      = [
+    google_project_iam_member.composer_service_agent_v2ext,
+    google_project_iam_member.cloudservices_editor
+  ]
   create_duration = "60s"
 }
 
-# ----------------------------------------
-# Service Account Composer (workers)
-# ----------------------------------------
+# ------------------------------------------------------------
+# Service Account pour l'environnement Composer (workers)
+# ------------------------------------------------------------
 resource "google_service_account" "composer" {
   project      = local.project_id
   account_id   = "sa-composer-dev"
@@ -121,9 +152,18 @@ resource "google_service_account" "composer" {
   depends_on = [google_project_service.apis]
 }
 
-# ----------------------------------------
-# IAM sur tes buckets (landing/archive)
-# ----------------------------------------
+# Composer workers role (obligatoire)
+resource "google_project_iam_member" "composer_worker_role" {
+  project = local.project_id
+  role    = "roles/composer.worker"
+  member  = "serviceAccount:${google_service_account.composer.email}"
+
+  depends_on = [google_service_account.composer]
+}
+
+# ------------------------------------------------------------
+# IAM buckets (landing/archive)
+# ------------------------------------------------------------
 resource "google_storage_bucket_iam_member" "landing_viewer_composer" {
   bucket = google_storage_bucket.landing.name
   role   = "roles/storage.objectViewer"
@@ -136,23 +176,35 @@ resource "google_storage_bucket_iam_member" "archive_admin_composer" {
   member = "serviceAccount:${google_service_account.composer.email}"
 }
 
-# Secrets (si tu stockes les creds dbt/snowflake dans Secret Manager)
+# Optionnel : accès secrets (Snowflake/dbt) si tu utilises Secret Manager
 resource "google_project_iam_member" "composer_secret_accessor" {
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.composer.email}"
 }
 
-# ----------------------------------------
-# Composer environment DEV
-# ----------------------------------------
+# Accès UI Composer pour ton user (console + liste env)
+resource "google_project_iam_member" "composer_user_me" {
+  project = local.project_id
+  role    = "roles/composer.user"
+  member  = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_project_service.apis]
+}
+
+# ------------------------------------------------------------
+# Composer Environment DEV
+# ------------------------------------------------------------
 resource "google_composer_environment" "dev" {
   project = local.project_id
   name    = "composer-pipeone-dev"
   region  = var.region
 
   depends_on = [
-    time_sleep.wait_composer_iam
+    time_sleep.wait_composer_iam,
+    google_project_iam_member.composer_worker_role,
+    google_storage_bucket_iam_member.landing_viewer_composer,
+    google_storage_bucket_iam_member.archive_admin_composer
   ]
 
   config {
