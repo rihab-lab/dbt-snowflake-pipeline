@@ -62,6 +62,7 @@ resource "google_storage_bucket_iam_member" "landing_admin" {
   depends_on = [google_storage_bucket.landing]
 }
 
+#to be addded storage.bucketViewer
 resource "google_storage_bucket_iam_member" "archive_admin" {
   bucket = google_storage_bucket.archive.name
   role   = "roles/storage.objectAdmin"
@@ -87,6 +88,15 @@ resource "google_project_service" "apis" {
   project            = local.project_id
   service            = each.value
   disable_on_destroy = false
+}
+
+# Donne au Cloud Composer Service Agent les permissions requises (Composer 2)
+resource "google_project_iam_member" "composer_service_agent_v2ext" {
+  project = local.project_id
+  role    = "roles/composer.ServiceAgentV2Ext"
+  member  = "serviceAccount:service-${module.project.project_numbers["dev"]}@cloudcomposer-accounts.iam.gserviceaccount.com"
+
+  depends_on = [google_project_service.apis]
 }
 resource "google_service_account" "composer" {
   project      = local.project_id
