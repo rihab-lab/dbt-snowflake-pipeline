@@ -71,7 +71,9 @@ resource "google_storage_bucket_iam_member" "archive_admin" {
   depends_on = [google_storage_bucket.landing]
 }
 #composer
-# Active les APIs requises (Composer + dépendances)
+# ----------------------------------------
+# APIs requises
+# ----------------------------------------
 resource "google_project_service" "apis" {
   for_each = toset([
     "composer.googleapis.com",
@@ -90,7 +92,10 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# Donne au Cloud Composer Service Agent les permissions requises (Composer 2)
+# ----------------------------------------
+# Cloud Composer 2 Service Agent permissions
+# (obligatoire pour créer l'env)
+# ----------------------------------------
 resource "google_project_iam_member" "composer_service_agent_v2ext" {
   project = local.project_id
   role    = "roles/composer.ServiceAgentV2Ext"
@@ -98,48 +103,63 @@ resource "google_project_iam_member" "composer_service_agent_v2ext" {
 
   depends_on = [google_project_service.apis]
 }
+
+# Attendre la propagation IAM (évite le 400 failedPrecondition)
+resource "time_sleep" "wait_composer_iam" {
+  depends_on      = [google_project_iam_member.composer_service_agent_v2ext]
+  create_duration = "60s"
+}
+
+# ----------------------------------------
+# Service Account Composer (workers)
+# ----------------------------------------
 resource "google_service_account" "composer" {
   project      = local.project_id
   account_id   = "sa-composer-dev"
   display_name = "Composer SA (dev)"
-  depends_on   = [google_project_service.apis]
+
+  depends_on = [google_project_service.apis]
 }
 
-# Donne accès lecture aux fichiers entrants
+# ----------------------------------------
+# IAM sur tes buckets (landing/archive)
+# ----------------------------------------
 resource "google_storage_bucket_iam_member" "landing_viewer_composer" {
   bucket = google_storage_bucket.landing.name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.composer.email}"
 }
 
-# Donne accès écriture pour archiver / déplacer
 resource "google_storage_bucket_iam_member" "archive_admin_composer" {
   bucket = google_storage_bucket.archive.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.composer.email}"
 }
 
-# Lire les secrets (Snowflake/dbt) dans Secret Manager (si tu l'utilises)
+# Secrets (si tu stockes les creds dbt/snowflake dans Secret Manager)
 resource "google_project_iam_member" "composer_secret_accessor" {
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.composer.email}"
 }
+
+# ----------------------------------------
+# Composer environment DEV
+# ----------------------------------------
 resource "google_composer_environment" "dev" {
   project = local.project_id
   name    = "composer-pipeone-dev"
   region  = var.region
-  
+
   depends_on = [
-    google_project_service.apis,
-    google_project_iam_member.composer_service_agent_v2ext
+    time_sleep.wait_composer_iam
   ]
+
   config {
     node_config {
       service_account = google_service_account.composer.email
     }
 
-    # Composer 2
     software_config {
       image_version = "composer-2-airflow-2"
     }
@@ -167,8 +187,4 @@ resource "google_composer_environment" "dev" {
       }
     }
   }
-
-  depends_on = [
-    google_project_service.apis
-  ]
 }
