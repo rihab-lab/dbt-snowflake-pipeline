@@ -37,7 +37,7 @@ resource "google_storage_bucket" "landing" {
 
 # Bucket archive
 resource "google_storage_bucket" "archive" {
-  name                        = "bck-pipeone-archive-"
+  name                        = "bck-pipeone-archive-stg"
   project                     = local.project_id
   location                    = var.region
   uniform_bucket_level_access = true
