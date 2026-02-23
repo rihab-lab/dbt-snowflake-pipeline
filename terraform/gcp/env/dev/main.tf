@@ -11,3 +11,45 @@ module "project" {
     managed_by  = "terraform"
   }
 }
+# On récupère l'ID du projet créé
+locals {
+  project_id = module.project.projects_map["dev"]
+}
+
+# Bucket landing
+resource "google_storage_bucket" "landing" {
+  name                        = "bck-pipeone-landing-dev"
+  project                     = local.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = true
+  }
+
+  lifecycle_rule {
+    condition { age = 30 }
+    action    { type = "Delete" }
+  }
+
+  depends_on = [module.project]
+}
+
+# Bucket archive
+resource "google_storage_bucket" "archive" {
+  name                        = "bck-pipeone-archive-dev"
+  project                     = local.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = true
+  }
+
+  lifecycle_rule {
+    condition { age = 180 }
+    action    { type = "Delete" }
+  }
+
+  depends_on = [module.project]
+}
