@@ -129,7 +129,11 @@ resource "google_composer_environment" "dev" {
   project = local.project_id
   name    = "composer-pipeone-dev"
   region  = var.region
-
+  
+  depends_on = [
+    google_project_service.apis,
+    google_project_iam_member.composer_service_agent_v2ext
+  ]
   config {
     node_config {
       service_account = google_service_account.composer.email
