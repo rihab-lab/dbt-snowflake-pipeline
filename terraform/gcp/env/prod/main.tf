@@ -54,3 +54,19 @@ resource "google_storage_bucket" "archive" {
 
   depends_on = [module.project]
 }
+
+resource "google_storage_bucket_iam_member" "landing_admin" {
+  bucket = google_storage_bucket.landing.name
+  role   = "roles/storage.objectAdmin"
+  member = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_storage_bucket.landing]
+}
+
+resource "google_storage_bucket_iam_member" "archive_admin" {
+  bucket = google_storage_bucket.archive.name
+  role   = "roles/storage.objectAdmin"
+  member = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_storage_bucket.landing]
+}
