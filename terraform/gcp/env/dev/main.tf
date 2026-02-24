@@ -250,3 +250,10 @@ resource "google_project_iam_member" "monitoring_viewer_me" {
 
   depends_on = [google_project_service.apis]
 }
+
+# Accès à ton user pour lire/voir les DAGs dans le bucket Composer
+resource "google_storage_bucket_iam_member" "composer_bucket_viewer_me" {
+  bucket = "europe-west1-composer-pipeo-f6eee988-bucket"
+  role   = "roles/storage.objectViewer"
+  member = "user:rihab.bahri7@rbaapp.com"
+}
