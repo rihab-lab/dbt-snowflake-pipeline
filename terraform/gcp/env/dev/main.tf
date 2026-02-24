@@ -326,12 +326,16 @@ resource "google_project_iam_member" "dbt_job_artifact_reader" {
 # 4) Secrets Snowflake (conteneurs)
 resource "google_secret_manager_secret" "snowflake_account" {
   secret_id = "snowflake-account-dev"
-  replication { auto {} }
+  replication {
+  auto {}
+}
 }
 
 resource "google_secret_manager_secret" "snowflake_user" {
   secret_id = "snowflake-user-dev"
-  replication { auto {} }
+  replication {
+  auto {}
+}
 }
 
 resource "google_secret_manager_secret" "snowflake_password" {
@@ -367,6 +371,7 @@ resource "google_secret_manager_secret" "snowflake_schema" {
   secret_id = "snowflake-schema-dev"
   replication {
   auto {}
+}
 }
 
 # 5) Autoriser le SA du job à lire les secrets
