@@ -240,3 +240,21 @@ resource "google_composer_environment" "dev" {
     }
   }
 }
+
+# Accès à l’UI Composer
+resource "google_project_iam_member" "composer_user_me" {
+  project = local.project_id
+  role    = "roles/composer.user"
+  member  = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_project_service.apis]
+}
+
+# Accès Monitoring (sinon page surveillance bloquée)
+resource "google_project_iam_member" "monitoring_viewer_me" {
+  project = local.project_id
+  role    = "roles/monitoring.viewer"
+  member  = "user:rihab.bahri7@rbaapp.com"
+
+  depends_on = [google_project_service.apis]
+}
