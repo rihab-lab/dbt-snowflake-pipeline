@@ -8,6 +8,7 @@ on:
         type: choice
         required: true
         options: [dev, stg, prod]
+
   push:
     paths:
       - "airflow/dags/**"
@@ -19,29 +20,45 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Auth to Google Cloud (WIF)
+      # -----------------------------
+      # Authenticate via Workload Identity
+      # (IMPERSONATE SERVICE ACCOUNT)
+      # -----------------------------
+      - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_TERRAFORM_SA_EMAIL }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+          token_format: "access_token"
+          create_credentials_file: true
 
-      - name: Set bucket per env
-        id: vars
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      # -----------------------------
+      # Select bucket per environment
+      # -----------------------------
+      - name: Select bucket
+        id: bucket
         run: |
           ENV="${{ github.event.inputs.environment }}"
           if [ -z "$ENV" ]; then ENV="dev"; fi
 
           if [ "$ENV" = "dev" ]; then
-            echo "bucket=europe-west1-composer-pipeo-f6eee988-bucket" >> $GITHUB_OUTPUT
+            echo "name=europe-west1-composer-pipeo-f6eee988-bucket" >> $GITHUB_OUTPUT
           elif [ "$ENV" = "stg" ]; then
-            echo "bucket=europe-west1-composer-XXXX-bucket" >> $GITHUB_OUTPUT
+            echo "name=europe-west1-composer-XXXX-bucket" >> $GITHUB_OUTPUT
           elif [ "$ENV" = "prod" ]; then
-            echo "bucket=europe-west1-composer-YYYY-bucket" >> $GITHUB_OUTPUT
+            echo "name=europe-west1-composer-YYYY-bucket" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload DAGs to Composer bucket
+      # -----------------------------
+      # Deploy DAGs
+      # -----------------------------
+      - name: Upload DAGs to Composer
         run: |
-          gcloud storage rsync -r airflow/dags gs://${{ steps.vars.outputs.bucket }}/dags
+          gcloud storage rsync -r airflow/dags gs://${{ steps.bucket.outputs.name }}/dags
