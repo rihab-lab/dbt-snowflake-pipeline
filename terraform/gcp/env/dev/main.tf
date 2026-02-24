@@ -272,3 +272,29 @@ resource "google_storage_bucket_iam_member" "composer_bucket_admin_ci" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${var.ci_service_account_email}"
 }
+
+# Active l'API Artifact Registry
+resource "google_project_service" "artifactregistry_api" {
+  project            = local.project_id
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Repo Docker pour stocker l'image dbt
+resource "google_artifact_registry_repository" "docker_repo" {
+  project       = local.project_id
+  location      = var.region            # europe-west1
+  repository_id = "ar-pipeone-dev"
+  format        = "DOCKER"
+  description   = "Docker images for PipeOne (dev)"
+
+  depends_on = [google_project_service.artifactregistry_api]
+}
+
+resource "google_artifact_registry_repository_iam_member" "ci_writer" {
+  project    = local.project_id
+  location   = google_artifact_registry_repository.docker_repo.location
+  repository = google_artifact_registry_repository.docker_repo.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${var.ci_service_account_email}"
+}
