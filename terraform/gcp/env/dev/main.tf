@@ -265,9 +265,7 @@ resource "google_storage_bucket_iam_member" "composer_bucket_admin_me" {
   member = "user:rihab.bahri7@rbaapp.com"
 }
 
-variable "ci_service_account_email" {
-  type = string
-}
+
 
 resource "google_storage_bucket_iam_member" "composer_bucket_admin_ci" {
   bucket = "europe-west1-composer-pipeo-f6eee988-bucket"

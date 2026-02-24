@@ -26,6 +26,7 @@ jobs:
       TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
       TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
+      TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
 
     steps:
       - uses: actions/checkout@v4
