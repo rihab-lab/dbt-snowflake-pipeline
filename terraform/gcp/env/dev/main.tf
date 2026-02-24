@@ -257,3 +257,10 @@ resource "google_storage_bucket_iam_member" "composer_bucket_viewer_me" {
   role   = "roles/storage.objectViewer"
   member = "user:rihab.bahri7@rbaapp.com"
 }
+
+# Pour uploader/modifier les DAGs (recommandé si tu veux déposer des fichiers)
+resource "google_storage_bucket_iam_member" "composer_bucket_admin_me" {
+  bucket = "europe-west1-composer-pipeo-f6eee988-bucket"
+  role   = "roles/storage.objectAdmin"
+  member = "user:rihab.bahri7@rbaapp.com"
+}

@@ -1,0 +1,27 @@
+name: Deploy Airflow DAGs (dev)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "airflow/dags/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA_EMAIL }}
+
+      - name: Upload DAGs to Composer bucket
+        run: |
+          gcloud storage rsync -r airflow/dags gs://europe-west1-composer-pipeo-f6eee988-bucket/dags
