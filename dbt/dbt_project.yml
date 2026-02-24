@@ -1,0 +1,11 @@
+name: snowdbt
+version: 1.0.0
+config-version: 2
+
+profile: snowdbt
+
+model-paths: ["models"]
+
+models:
+  snowdbt:
+    +materialized: view
