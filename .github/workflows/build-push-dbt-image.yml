@@ -1,0 +1,84 @@
+name: Build & Push dbt image
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: [dev, stg, prod]
+
+  push:
+    paths:
+      - "dbt/**"
+      - "docker/dbt/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build_push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------
+      # Select environment config
+      # -----------------------------
+      - name: Select environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          if [ -z "$ENV" ]; then ENV="dev"; fi
+
+          if [ "$ENV" = "dev" ]; then
+            echo "project_id=snowdbt-dev" >> $GITHUB_OUTPUT
+            echo "repo=ar-pipeone-dev" >> $GITHUB_OUTPUT
+          elif [ "$ENV" = "stg" ]; then
+            echo "project_id=snowdbt-stg" >> $GITHUB_OUTPUT
+            echo "repo=ar-pipeone-stg" >> $GITHUB_OUTPUT
+          elif [ "$ENV" = "prod" ]; then
+            echo "project_id=snowdbt-prod" >> $GITHUB_OUTPUT
+            echo "repo=ar-pipeone-prod" >> $GITHUB_OUTPUT
+          fi
+
+          echo "region=europe-west1" >> $GITHUB_OUTPUT
+          echo "image=dbt" >> $GITHUB_OUTPUT
+          echo "tag=latest" >> $GITHUB_OUTPUT
+
+      # -----------------------------
+      # Authenticate to GCP
+      # -----------------------------
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+          token_format: "access_token"
+          create_credentials_file: true
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth
+        run: |
+          gcloud auth configure-docker ${{ steps.env.outputs.region }}-docker.pkg.dev --quiet
+
+      # -----------------------------
+      # Build image
+      # -----------------------------
+      - name: Build Docker image
+        run: |
+          docker build -f docker/dbt/Dockerfile \
+            -t ${{ steps.env.outputs.region }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ steps.env.outputs.repo }}/${{ steps.env.outputs.image }}:${{ steps.env.outputs.tag }} \
+            .
+
+      # -----------------------------
+      # Push image
+      # -----------------------------
+      - name: Push Docker image
+        run: |
+          docker push ${{ steps.env.outputs.region }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ steps.env.outputs.repo }}/${{ steps.env.outputs.image }}:${{ steps.env.outputs.tag }}
