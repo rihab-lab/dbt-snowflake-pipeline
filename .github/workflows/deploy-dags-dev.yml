@@ -1,7 +1,13 @@
-name: Deploy Airflow DAGs (dev)
+name: Deploy Airflow DAGs
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: [dev, stg, prod]
   push:
     paths:
       - "airflow/dags/**"
@@ -22,6 +28,20 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA_EMAIL }}
 
+      - name: Set bucket per env
+        id: vars
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          if [ -z "$ENV" ]; then ENV="dev"; fi
+
+          if [ "$ENV" = "dev" ]; then
+            echo "bucket=europe-west1-composer-pipeo-f6eee988-bucket" >> $GITHUB_OUTPUT
+          elif [ "$ENV" = "stg" ]; then
+            echo "bucket=europe-west1-composer-XXXX-bucket" >> $GITHUB_OUTPUT
+          elif [ "$ENV" = "prod" ]; then
+            echo "bucket=europe-west1-composer-YYYY-bucket" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload DAGs to Composer bucket
         run: |
-          gcloud storage rsync -r airflow/dags gs://europe-west1-composer-pipeo-f6eee988-bucket/dags
+          gcloud storage rsync -r airflow/dags gs://${{ steps.vars.outputs.bucket }}/dags
