@@ -57,6 +57,11 @@ jobs:
       - name: Terraform validate
         run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
 
+      - name: Terraform apply (APIs first)
+        run: |
+          terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve \
+            -target=google_project_service.apis
+
       - name: Terraform plan
         run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
 
