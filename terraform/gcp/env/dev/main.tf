@@ -328,7 +328,9 @@ resource "google_secret_manager_secret" "snowflake_account" {
   secret_id = "snowflake-account-dev"
   replication {
   auto {}
+  
 }
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret" "snowflake_user" {
@@ -336,6 +338,7 @@ resource "google_secret_manager_secret" "snowflake_user" {
   replication {
   auto {}
 }
+depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret" "snowflake_password" {
