@@ -516,3 +516,11 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
     google_project_iam_member.dbt_job_secret_accessor
   ]
 }
+
+output "debug_local_project_id" {
+  value = local.project_id
+}
+
+output "debug_secret_project" {
+  value = google_secret_manager_secret.snowflake_account.project
+}

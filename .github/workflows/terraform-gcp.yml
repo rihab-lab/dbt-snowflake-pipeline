@@ -53,6 +53,9 @@ jobs:
           terraform -chdir=${{ steps.sel.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
             -backend-config="prefix=${{ steps.sel.outputs.prefix }}"
+      
+      - name: Debug terraform outputs
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} output
 
       - name: Terraform validate
         run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
