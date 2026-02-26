@@ -303,108 +303,86 @@ resource "google_artifact_registry_repository_iam_member" "ci_writer" {
 # Cloud Run Job (dbt) - DEV
 # ============================================================
 
-# 1) Activer l'API Cloud Run
+############################
+# 1️⃣ APIs
+############################
+
 resource "google_project_service" "run_api" {
   project            = local.project_id
   service            = "run.googleapis.com"
   disable_on_destroy = false
 }
 
-# 2) Service Account dbt job
+resource "google_project_service" "secretmanager_api" {
+  project            = local.project_id
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+############################
+# 2️⃣ Service Account
+############################
+
 resource "google_service_account" "dbt_job_sa" {
   project      = local.project_id
   account_id   = "sa-dbt-job-dev"
   display_name = "Service Account for dbt Cloud Run Job (dev)"
 }
 
-# 3) Artifact Registry access
+############################
+# 3️⃣ IAM
+############################
+
 resource "google_project_iam_member" "dbt_job_artifact_reader" {
   project = local.project_id
   role    = "roles/artifactregistry.reader"
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
-# 4) Secrets (conteneurs)
-resource "google_secret_manager_secret" "snowflake_account" {
-  secret_id = "snowflake-account-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_user" {
-  secret_id = "snowflake-user-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_password" {
-  secret_id = "snowflake-password-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_role" {
-  secret_id = "snowflake-role-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_warehouse" {
-  secret_id = "snowflake-warehouse-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_database" {
-  secret_id = "snowflake-database-dev"
-  replication { auto {} }
-}
-
-resource "google_secret_manager_secret" "snowflake_schema" {
-  secret_id = "snowflake-schema-dev"
-  replication { auto {} }
-}
-
-# 5) Versions automatiques (IMPORTANT 🔥)
-
-resource "google_secret_manager_secret_version" "account_v1" {
-  secret      = google_secret_manager_secret.snowflake_account.id
-  secret_data = var.snowflake_account
-}
-
-resource "google_secret_manager_secret_version" "user_v1" {
-  secret      = google_secret_manager_secret.snowflake_user.id
-  secret_data = var.snowflake_user
-}
-
-resource "google_secret_manager_secret_version" "password_v1" {
-  secret      = google_secret_manager_secret.snowflake_password.id
-  secret_data = var.snowflake_password
-}
-
-resource "google_secret_manager_secret_version" "role_v1" {
-  secret      = google_secret_manager_secret.snowflake_role.id
-  secret_data = var.snowflake_role
-}
-
-resource "google_secret_manager_secret_version" "warehouse_v1" {
-  secret      = google_secret_manager_secret.snowflake_warehouse.id
-  secret_data = var.snowflake_warehouse
-}
-
-resource "google_secret_manager_secret_version" "database_v1" {
-  secret      = google_secret_manager_secret.snowflake_database.id
-  secret_data = var.snowflake_database
-}
-
-resource "google_secret_manager_secret_version" "schema_v1" {
-  secret      = google_secret_manager_secret.snowflake_schema.id
-  secret_data = var.snowflake_schema
-}
-
-# 6) Autoriser le SA à lire les secrets
 resource "google_project_iam_member" "dbt_job_secret_accessor" {
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
-# 7) Cloud Run Job
+############################
+# 4️⃣ Secrets (containers)
+############################
+
+locals {
+  snowflake_secrets = {
+    account   = var.snowflake_account
+    user      = var.snowflake_user
+    password  = var.snowflake_password
+    role      = var.snowflake_role
+    warehouse = var.snowflake_warehouse
+    database  = var.snowflake_database
+    schema    = var.snowflake_schema
+  }
+}
+
+resource "google_secret_manager_secret" "snowflake" {
+  for_each  = local.snowflake_secrets
+  project   = local.project_id
+  secret_id = "snowflake-${each.key}-dev"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager_api]
+}
+
+resource "google_secret_manager_secret_version" "snowflake_versions" {
+  for_each    = local.snowflake_secrets
+  secret      = google_secret_manager_secret.snowflake[each.key].id
+  secret_data = each.value
+}
+
+############################
+# 5️⃣ Cloud Run Job
+############################
+
 resource "google_cloud_run_v2_job" "dbt_run_dev" {
   project  = local.project_id
   location = var.region
@@ -417,72 +395,16 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
       containers {
         image = "europe-west1-docker.pkg.dev/${local.project_id}/ar-pipeone-dev/dbt:latest"
 
-        env {
-          name = "SNOWFLAKE_ACCOUNT"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_account.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_USER"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_user.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_PASSWORD"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_password.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_ROLE"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_role.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_WAREHOUSE"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_warehouse.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_DATABASE"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_database.secret_id
-              version = "latest"
-            }
-          }
-        }
-
-        env {
-          name = "SNOWFLAKE_SCHEMA"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.snowflake_schema.secret_id
-              version = "latest"
+        # Inject secrets automatiquement
+        dynamic "env" {
+          for_each = google_secret_manager_secret.snowflake
+          content {
+            name = upper("SNOWFLAKE_${env.key}")
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = "latest"
+              }
             }
           }
         }
@@ -493,6 +415,7 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
   depends_on = [
     google_project_service.run_api,
     google_project_iam_member.dbt_job_artifact_reader,
-    google_project_iam_member.dbt_job_secret_accessor
+    google_project_iam_member.dbt_job_secret_accessor,
+    google_secret_manager_secret_version.snowflake_versions
   ]
 }
