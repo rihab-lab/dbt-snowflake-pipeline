@@ -303,6 +303,18 @@ resource "google_artifact_registry_repository_iam_member" "ci_writer" {
 # Cloud Run Job (dbt) - DEV (sécurisé via Secret Manager)
 # ============================================================
 
+# 0) Activer Secret Manager API + attendre la propagation
+resource "google_project_service" "secretmanager_api" {
+  project            = local.project_id
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "time_sleep" "wait_secretmanager_api" {
+  depends_on      = [google_project_service.secretmanager_api]
+  create_duration = "60s"
+}
+
 # 1) Activer l'API Cloud Run (si pas déjà activée)
 resource "google_project_service" "run_api" {
   project            = local.project_id
@@ -323,58 +335,77 @@ resource "google_project_iam_member" "dbt_job_artifact_reader" {
   role    = "roles/artifactregistry.reader"
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
+
 # 4) Secrets Snowflake (conteneurs)
 resource "google_secret_manager_secret" "snowflake_account" {
   secret_id = "snowflake-account-dev"
+
   replication {
-  auto {}
-  
-}
-  depends_on = [google_project_service.apis]
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 resource "google_secret_manager_secret" "snowflake_user" {
   secret_id = "snowflake-user-dev"
+
   replication {
-  auto {}
-}
-depends_on = [google_project_service.apis]
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 resource "google_secret_manager_secret" "snowflake_password" {
   secret_id = "snowflake-password-dev"
+
   replication {
-  auto {}
-}
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 # Optionnel (tu peux aussi les garder en env non-secrets)
 resource "google_secret_manager_secret" "snowflake_role" {
   secret_id = "snowflake-role-dev"
+
   replication {
-  auto {}
-}
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 resource "google_secret_manager_secret" "snowflake_warehouse" {
   secret_id = "snowflake-warehouse-dev"
+
   replication {
-  auto {}
-}
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 resource "google_secret_manager_secret" "snowflake_database" {
   secret_id = "snowflake-database-dev"
+
   replication {
-  auto {}
-}
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 resource "google_secret_manager_secret" "snowflake_schema" {
   secret_id = "snowflake-schema-dev"
+
   replication {
-  auto {}
-}
+    auto {}
+  }
+
+  depends_on = [time_sleep.wait_secretmanager_api]
 }
 
 # 5) Autoriser le SA du job à lire les secrets
