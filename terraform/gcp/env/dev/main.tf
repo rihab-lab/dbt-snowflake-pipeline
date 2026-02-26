@@ -415,6 +415,13 @@ resource "google_project_iam_member" "dbt_job_secret_accessor" {
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
+resource "google_project_iam_member" "ci_secret_admin" {
+  project = local.project_id
+  role    = "roles/secretmanager.admin"
+  member  = "serviceAccount:${var.ci_service_account_email}"
+
+  depends_on = [google_project_service.apis]
+}
 # 6) Cloud Run Job dbt
 resource "google_cloud_run_v2_job" "dbt_run_dev" {
   project  = local.project_id
