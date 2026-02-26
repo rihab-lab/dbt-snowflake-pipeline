@@ -27,6 +27,13 @@ jobs:
 
       TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
       TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
+      TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      TF_VAR_snowflake_user:      ${{ secrets.SNOWFLAKE_USER }}
+      TF_VAR_snowflake_password:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      TF_VAR_snowflake_role:      ${{ secrets.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      TF_VAR_snowflake_database:  ${{ secrets.SNOWFLAKE_DATABASE }}
+      TF_VAR_snowflake_schema:    ${{ secrets.SNOWFLAKE_SCHEMA }}
 
     steps:
       - uses: actions/checkout@v4
@@ -53,9 +60,6 @@ jobs:
           terraform -chdir=${{ steps.sel.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
             -backend-config="prefix=${{ steps.sel.outputs.prefix }}"
-      
-      - name: Debug terraform outputs
-        run: terraform -chdir=${{ steps.sel.outputs.dir }} output
 
       - name: Terraform validate
         run: terraform -chdir=${{ steps.sel.outputs.dir }} validate

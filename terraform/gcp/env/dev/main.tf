@@ -300,129 +300,111 @@ resource "google_artifact_registry_repository_iam_member" "ci_writer" {
 }
 
 # ============================================================
-# Cloud Run Job (dbt) - DEV (sécurisé via Secret Manager)
+# Cloud Run Job (dbt) - DEV
 # ============================================================
 
-# 0) Activer Secret Manager API + attendre la propagation
-resource "google_project_service" "secretmanager_api" {
-  project            = local.project_id
-  service            = "secretmanager.googleapis.com"
-  disable_on_destroy = false
-}
-
-resource "time_sleep" "wait_secretmanager_api" {
-  depends_on      = [google_project_service.secretmanager_api]
-  create_duration = "60s"
-}
-
-# 1) Activer l'API Cloud Run (si pas déjà activée)
+# 1) Activer l'API Cloud Run
 resource "google_project_service" "run_api" {
   project            = local.project_id
   service            = "run.googleapis.com"
   disable_on_destroy = false
 }
 
-# 2) Service Account pour exécuter le job dbt
+# 2) Service Account dbt job
 resource "google_service_account" "dbt_job_sa" {
   project      = local.project_id
   account_id   = "sa-dbt-job-dev"
   display_name = "Service Account for dbt Cloud Run Job (dev)"
 }
 
-# 3) Donner au SA l'accès en lecture à Artifact Registry (pull image)
+# 3) Artifact Registry access
 resource "google_project_iam_member" "dbt_job_artifact_reader" {
   project = local.project_id
   role    = "roles/artifactregistry.reader"
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
-# 4) Secrets Snowflake (conteneurs)
+# 4) Secrets (conteneurs)
 resource "google_secret_manager_secret" "snowflake_account" {
   secret_id = "snowflake-account-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
 resource "google_secret_manager_secret" "snowflake_user" {
   secret_id = "snowflake-user-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
 resource "google_secret_manager_secret" "snowflake_password" {
   secret_id = "snowflake-password-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
-# Optionnel (tu peux aussi les garder en env non-secrets)
 resource "google_secret_manager_secret" "snowflake_role" {
   secret_id = "snowflake-role-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
 resource "google_secret_manager_secret" "snowflake_warehouse" {
   secret_id = "snowflake-warehouse-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
 resource "google_secret_manager_secret" "snowflake_database" {
   secret_id = "snowflake-database-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
 resource "google_secret_manager_secret" "snowflake_schema" {
   secret_id = "snowflake-schema-dev"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [time_sleep.wait_secretmanager_api]
+  replication { auto {} }
 }
 
-# 5) Autoriser le SA du job à lire les secrets
+# 5) Versions automatiques (IMPORTANT 🔥)
+
+resource "google_secret_manager_secret_version" "account_v1" {
+  secret      = google_secret_manager_secret.snowflake_account.id
+  secret_data = var.snowflake_account
+}
+
+resource "google_secret_manager_secret_version" "user_v1" {
+  secret      = google_secret_manager_secret.snowflake_user.id
+  secret_data = var.snowflake_user
+}
+
+resource "google_secret_manager_secret_version" "password_v1" {
+  secret      = google_secret_manager_secret.snowflake_password.id
+  secret_data = var.snowflake_password
+}
+
+resource "google_secret_manager_secret_version" "role_v1" {
+  secret      = google_secret_manager_secret.snowflake_role.id
+  secret_data = var.snowflake_role
+}
+
+resource "google_secret_manager_secret_version" "warehouse_v1" {
+  secret      = google_secret_manager_secret.snowflake_warehouse.id
+  secret_data = var.snowflake_warehouse
+}
+
+resource "google_secret_manager_secret_version" "database_v1" {
+  secret      = google_secret_manager_secret.snowflake_database.id
+  secret_data = var.snowflake_database
+}
+
+resource "google_secret_manager_secret_version" "schema_v1" {
+  secret      = google_secret_manager_secret.snowflake_schema.id
+  secret_data = var.snowflake_schema
+}
+
+# 6) Autoriser le SA à lire les secrets
 resource "google_project_iam_member" "dbt_job_secret_accessor" {
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
-resource "google_project_iam_member" "ci_secret_admin" {
-  project = local.project_id
-  role    = "roles/secretmanager.admin"
-  member  = "serviceAccount:${var.ci_service_account_email}"
-
-  depends_on = [google_project_service.apis]
-}
-# 6) Cloud Run Job dbt
+# 7) Cloud Run Job
 resource "google_cloud_run_v2_job" "dbt_run_dev" {
   project  = local.project_id
   location = var.region
@@ -433,10 +415,8 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
       service_account = google_service_account.dbt_job_sa.email
 
       containers {
-        # Image poussée par ta CI build/push
         image = "europe-west1-docker.pkg.dev/${local.project_id}/ar-pipeone-dev/dbt:latest"
 
-        # --- Secrets Snowflake ---
         env {
           name = "SNOWFLAKE_ACCOUNT"
           value_source {
@@ -515,12 +495,4 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
     google_project_iam_member.dbt_job_artifact_reader,
     google_project_iam_member.dbt_job_secret_accessor
   ]
-}
-
-output "debug_local_project_id" {
-  value = local.project_id
-}
-
-output "debug_secret_project" {
-  value = google_secret_manager_secret.snowflake_account.project
 }
