@@ -9,8 +9,8 @@ snowdbt:
   outputs:
     dev:
       type: snowflake
-      account: ${SNOWFLAKE_ACCOUNT}
-      user: ${SNOWFLAKE_USER}
+      account: ${SNOWFLAKE_ACCOUNT_NAME}
+      user: ${SNOWFLAKE_USERNAME}
       password: ${SNOWFLAKE_PASSWORD}
       role: ${SNOWFLAKE_ROLE}
       warehouse: ${SNOWFLAKE_WAREHOUSE}
