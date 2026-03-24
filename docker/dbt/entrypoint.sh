@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mkdir -p /root/.dbt
-
+echo "DEBUG SNOWFLAKE_ACCOUNT=$SNOWFLAKE_ACCOUNT"
 cat > /root/.dbt/profiles.yml <<EOF
 snowdbt:
   target: dev
