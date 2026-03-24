@@ -32,10 +32,10 @@ jobs:
       TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_user:      ${{ secrets.SNOWFLAKE_USERNAME }}
       TF_VAR_snowflake_password:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-      TF_VAR_snowflake_role:      ${{ secrets.SNOWFLAKE_ROLE }}
-      TF_VAR_snowflake_warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      TF_VAR_snowflake_database:  ${{ secrets.SNOWFLAKE_DATABASE }}
-      TF_VAR_snowflake_schema:    ${{ secrets.SNOWFLAKE_SCHEMA }}
+      TF_VAR_snowflake_role:      ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_warehouse: ${{ vars.SNOWFLAKE_WAREHOUSE }}
+      TF_VAR_snowflake_database:  ${{ vars.SNOWFLAKE_DATABASE }}
+      TF_VAR_snowflake_schema:    ${{ vars.SNOWFLAKE_SCHEMA }}
 
     steps:
       - uses: actions/checkout@v4
