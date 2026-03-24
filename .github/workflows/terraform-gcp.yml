@@ -30,7 +30,7 @@ jobs:
       TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
 
       TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
-      TF_VAR_snowflake_organization_account: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
+      TF_VAR_snowflake_acount: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_user:      ${{ secrets.SNOWFLAKE_USERNAME }}
       TF_VAR_snowflake_password:  ${{ secrets.SNOWFLAKE_PASSWORD }}
       TF_VAR_snowflake_role:      ${{ vars.SNOWFLAKE_ROLE }}
