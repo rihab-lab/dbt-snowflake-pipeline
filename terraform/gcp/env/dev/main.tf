@@ -299,10 +299,7 @@ resource "google_artifact_registry_repository_iam_member" "ci_writer" {
   member     = "serviceAccount:${var.ci_service_account_email}"
 }
 
-# ============================================================
-# Cloud Run Job (dbt) - DEV
-# ============================================================
-
+#cloud run
 ############################
 # 1️⃣ APIs
 ############################
@@ -346,7 +343,7 @@ resource "google_project_iam_member" "dbt_job_secret_accessor" {
 }
 
 ############################
-# 4️⃣ Secrets (containers)
+# 4️⃣ Secrets
 ############################
 
 locals {
@@ -359,10 +356,15 @@ locals {
     database  = var.snowflake_database
     schema    = var.snowflake_schema
   }
+
+  snowflake_secrets_non_empty = {
+    for k, v in local.snowflake_secrets : k => v
+    if v != null && trim(v) != ""
+  }
 }
 
 resource "google_secret_manager_secret" "snowflake" {
-  for_each  = local.snowflake_secrets
+  for_each  = local.snowflake_secrets_non_empty
   project   = local.project_id
   secret_id = "snowflake-${each.key}-dev"
 
@@ -374,7 +376,7 @@ resource "google_secret_manager_secret" "snowflake" {
 }
 
 resource "google_secret_manager_secret_version" "snowflake_versions" {
-  for_each    = local.snowflake_secrets
+  for_each    = local.snowflake_secrets_non_empty
   secret      = google_secret_manager_secret.snowflake[each.key].id
   secret_data = each.value
 }
@@ -395,7 +397,6 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
       containers {
         image = "europe-west1-docker.pkg.dev/${local.project_id}/ar-pipeone-dev/dbt:latest"
 
-        # Inject secrets automatiquement
         dynamic "env" {
           for_each = google_secret_manager_secret.snowflake
           content {
