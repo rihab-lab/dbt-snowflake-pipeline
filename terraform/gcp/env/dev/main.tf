@@ -17,6 +17,7 @@ locals {
   project_id = module.project.projects_map["dev"]
 }
 
+#create landing & archive zone
 resource "google_project_iam_member" "ci_storage_admin" {
   project = local.project_id
   role    = "roles/storage.admin"
