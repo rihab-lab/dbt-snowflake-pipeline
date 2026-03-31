@@ -7,12 +7,17 @@ on:
         description: "Target environment"
         type: choice
         required: true
-        options: [dev, stg, prod]
+        options:
+          - dev
+          - stg
+          - prod
       action:
         description: "Terraform action"
         type: choice
         required: true
-        options: [apply, destroy]
+        options:
+          - apply
+          - destroy
 
 permissions:
   contents: read
@@ -28,24 +33,26 @@ jobs:
       TF_INPUT: "false"
 
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
-      TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
-      TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+      TF_VAR_org_id: ${{ secrets.TF_VAR_ORG_ID }}
+      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
       TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
       TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
-      TF_VAR_snowflake_user:      ${{ vars.SNOWFLAKE_USERNAME }}
-      TF_VAR_snowflake_password:  ${{ secrets.SVC_DBT_PASSWORD }}
-      TF_VAR_snowflake_role:      ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
+      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USERNAME }}
+      TF_VAR_snowflake_password: ${{ secrets.SVC_DBT_PASSWORD }}
+      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
       TF_VAR_snowflake_warehouse: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-      TF_VAR_snowflake_database:  ${{ vars.SNOWFLAKE_DATABASE }}
-      TF_VAR_snowflake_schema:    ${{ vars.SNOWFLAKE_SCHEMA }}
+      TF_VAR_snowflake_database: ${{ vars.SNOWFLAKE_DATABASE }}
+      TF_VAR_snowflake_schema: ${{ vars.SNOWFLAKE_SCHEMA }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.5
 
@@ -55,12 +62,32 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      - name: Select env directory
-        id: sel
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Select environment settings
+        id: config
         run: |
           ENV="${{ github.event.inputs.environment }}"
-          echo "dir=terraform/gcp/env/$ENV" >> $GITHUB_OUTPUT
-          echo "prefix=gcp/env/$ENV" >> $GITHUB_OUTPUT
+
+          echo "dir=terraform/gcp/env/$ENV" >> "$GITHUB_OUTPUT"
+          echo "prefix=gcp/env/$ENV" >> "$GITHUB_OUTPUT"
+
+          case "$ENV" in
+            dev)
+              echo "bucket=europe-west1-composer-pipeo-f6eee988-bucket" >> "$GITHUB_OUTPUT"
+              ;;
+            stg)
+              echo "bucket=europe-west1-composer-XXXX-bucket" >> "$GITHUB_OUTPUT"
+              ;;
+            prod)
+              echo "bucket=europe-west1-composer-YYYY-bucket" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown environment: $ENV"
+              exit 1
+              ;;
+          esac
 
       - name: Debug TF vars presence
         if: github.event.inputs.action == 'apply'
@@ -75,30 +102,36 @@ jobs:
 
       - name: Terraform init
         run: |
-          terraform -chdir=${{ steps.sel.outputs.dir }} init \
+          terraform -chdir=${{ steps.config.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
-            -backend-config="prefix=${{ steps.sel.outputs.prefix }}"
+            -backend-config="prefix=${{ steps.config.outputs.prefix }}"
 
       - name: Terraform validate
         if: github.event.inputs.action == 'apply'
-        run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
+        run: terraform -chdir=${{ steps.config.outputs.dir }} validate
 
-      - name: Terraform apply (APIs first)
+      - name: Terraform apply APIs first
         if: github.event.inputs.action == 'apply'
         run: |
-          terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve \
+          terraform -chdir=${{ steps.config.outputs.dir }} apply -auto-approve \
             -target=google_project_service.apis
 
       - name: Terraform plan
         if: github.event.inputs.action == 'apply'
-        run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
+        run: |
+          terraform -chdir=${{ steps.config.outputs.dir }} plan -out=tfplan
 
       - name: Terraform apply
         if: github.event.inputs.action == 'apply'
-        run: terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve tfplan
+        run: |
+          terraform -chdir=${{ steps.config.outputs.dir }} apply -auto-approve tfplan
 
-      - name: Terraform destroy Composer only
+      - name: Delete DAGs from Composer bucket
         if: github.event.inputs.action == 'destroy'
         run: |
-          terraform -chdir=${{ steps.sel.outputs.dir }} destroy -auto-approve \
-            -target=google_composer_environment.dev
+          gcloud storage rm --recursive "gs://${{ steps.config.outputs.bucket }}/dags" || true
+
+      - name: Terraform destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          terraform -chdir=${{ steps.config.outputs.dir }} destroy -auto-approve
