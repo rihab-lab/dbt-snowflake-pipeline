@@ -65,33 +65,26 @@ resource "google_storage_bucket" "archive" {
   google_project_iam_member.ci_storage_admin]
 }
 
-resource "google_storage_bucket_iam_member" "landing_admin" {
-  bucket = google_storage_bucket.landing.name
-  role   = "roles/storage.objectAdmin"
-  member = "user:rihab.bahri7@rbaapp.com"
-
-  depends_on = [google_storage_bucket.landing]
-}
-#to be addded storage.bucketViewer
-resource "google_storage_bucket_iam_member" "landing_viewer" {
+resource "google_storage_bucket_iam_member" "landing_bucket_viewer" {
   bucket = google_storage_bucket.landing.name
   role   = "roles/storage.bucketViewer"
   member = "user:rihab.bahri7@rbaapp.com"
-
-  depends_on = [google_storage_bucket.landing]
 }
-#to be addded storage.bucketViewer
-resource "google_storage_bucket_iam_member" "archive_admin" {
-  bucket = google_storage_bucket.archive.name
-  role   = "roles/storage.objectAdmin"
-  member = "user:rihab.bahri7@rbaapp.com"
 
-  depends_on = [google_storage_bucket.archive]
+resource "google_storage_bucket_iam_member" "landing_object_viewer" {
+  bucket = google_storage_bucket.landing.name
+  role   = "roles/storage.objectViewer"
+  member = "user:rihab.bahri7@rbaapp.com"
 }
-resource "google_storage_bucket_iam_member" "archive_viewer" {
-  bucket = google_storage_bucket.archive.name
-  role   = "roles/storage.objectAdmin"
-  member = "user:rihab.bahri7@rbaapp.com"
 
-  depends_on = [google_storage_bucket.archive]
+resource "google_storage_bucket_iam_member" "archive_bucket_viewer" {
+  bucket = google_storage_bucket.archive.name
+  role   = "roles/storage.bucketViewer"
+  member = "user:rihab.bahri7@rbaapp.com"
+}
+
+resource "google_storage_bucket_iam_member" "archive_object_viewer" {
+  bucket = google_storage_bucket.archive.name
+  role   = "roles/storage.objectViewer"
+  member = "user:rihab.bahri7@rbaapp.com"
 }
