@@ -88,9 +88,9 @@ resource "google_storage_bucket_iam_member" "archive_viewer" {
 # ------------------------------------------------------------
 # APIs requises (Composer + dépendances)
 # ------------------------------------------------------------
+# #"composer.googleapis.com", to be added in apis
 resource "google_project_service" "apis" {
   for_each = toset([
-    #"composer.googleapis.com",
     "compute.googleapis.com",
     "storage.googleapis.com",
     "iam.googleapis.com",
