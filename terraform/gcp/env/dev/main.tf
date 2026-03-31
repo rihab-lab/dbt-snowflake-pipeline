@@ -225,7 +225,7 @@ resource "google_composer_environment" "dev" {
 
   config {
     node_config {
-      service_account = google_service_account.composer.email[0]
+      service_account = google_service_account.composer[0].email
     }
 
     software_config {
