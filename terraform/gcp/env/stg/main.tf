@@ -53,13 +53,7 @@ resource "google_storage_bucket" "archive" {
 
   depends_on = [module.project]
 }
-resource "google_project_iam_member" "ci_storage_admin" {
-  project = local.project_id
-  role    = "roles/storage.admin"
-  member  = "serviceAccount:${var.ci_service_account_email}"
 
-  depends_on = [module.project]
-}
 resource "google_project_iam_member" "ci_storage_admin" {
   project = local.project_id
   role    = "roles/storage.admin"
