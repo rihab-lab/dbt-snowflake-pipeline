@@ -167,7 +167,7 @@ resource "google_project_iam_member" "composer_worker_role" {
   count  = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/composer.worker"
-  member  = "serviceAccount:${google_service_account.composer.email}"
+  member  = "serviceAccount:${google_service_account.composer[0].email}"
 
   depends_on = [google_service_account.composer]
 }
@@ -179,14 +179,14 @@ resource "google_storage_bucket_iam_member" "landing_viewer_composer" {
   count  = var.enable_composer ? 1 : 0
   bucket = google_storage_bucket.landing.name
   role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${google_service_account.composer.email}"
+  member = "serviceAccount:${google_service_account.composer[0].email}"
 }
 
 resource "google_storage_bucket_iam_member" "archive_admin_composer" {
   count  = var.enable_composer ? 1 : 0
   bucket = google_storage_bucket.archive.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.composer.email}"
+  member = "serviceAccount:${google_service_account.composer[0].email}"
 }
 
 # Optionnel : accès secrets (Snowflake/dbt) si tu utilises Secret Manager
@@ -194,7 +194,7 @@ resource "google_project_iam_member" "composer_secret_accessor" {
   count  = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.composer.email}"
+  member  = "serviceAccount:${google_service_account.composer[0].email}"
 }
 
 # Accès UI Composer pour ton user (console + liste env)
