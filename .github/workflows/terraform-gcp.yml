@@ -24,26 +24,26 @@ jobs:
       TF_VAR_enable_composer: "false"
 
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
-      TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
-      TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+      TF_VAR_org_id: ${{ secrets.TF_VAR_ORG_ID }}
+      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
 
       TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
       TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      #TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
-      TF_VAR_snowflake_user:      ${{ vars.SNOWFLAKE_USERNAME }}
-      #TF_VAR_snowflake_password:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-      TF_VAR_snowflake_password:  ${{ secrets.SVC_DBT_PASSWORD }}
-      TF_VAR_snowflake_role:      ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USERNAME }}
+      TF_VAR_snowflake_password: ${{ secrets.SVC_DBT_PASSWORD }}
+      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
       TF_VAR_snowflake_warehouse: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-      TF_VAR_snowflake_database:  ${{ vars.SNOWFLAKE_DATABASE }}
-      TF_VAR_snowflake_schema:    ${{ vars.SNOWFLAKE_SCHEMA }}
+      TF_VAR_snowflake_database: ${{ vars.SNOWFLAKE_DATABASE }}
+      TF_VAR_snowflake_schema: ${{ vars.SNOWFLAKE_SCHEMA }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.5
 
@@ -53,12 +53,22 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
+      - name: Setup gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Select env directory
         id: sel
         run: |
           ENV="${{ github.event.inputs.environment }}"
-          echo "dir=terraform/gcp/env/$ENV" >> $GITHUB_OUTPUT
-          echo "prefix=gcp/env/$ENV" >> $GITHUB_OUTPUT
+          echo "dir=terraform/gcp/env/$ENV" >> "$GITHUB_OUTPUT"
+          echo "prefix=gcp/env/$ENV" >> "$GITHUB_OUTPUT"
+
+      - name: Debug GCP identity
+        run: |
+          echo "===== gcloud auth list ====="
+          gcloud auth list
+          echo "===== gcloud current account ====="
+          gcloud config get-value account || true
 
       - name: Debug TF vars presence
         run: |
@@ -70,6 +80,49 @@ jobs:
           [ -n "${TF_VAR_snowflake_database}" ] && echo "database OK" || echo "database MISSING"
           [ -n "${TF_VAR_snowflake_schema}" ] && echo "schema OK" || echo "schema MISSING"
 
+      - name: Restore project if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT_ID="snowdbt-dev"
+          STATE=$(gcloud projects describe "$PROJECT_ID" --format="value(lifecycleState)" 2>/dev/null || echo "NOT_FOUND")
+
+          echo "Current lifecycleState: $STATE"
+
+          if [ "$STATE" = "DELETE_REQUESTED" ]; then
+            echo "Project is in DELETE_REQUESTED. Restoring..."
+            gcloud projects undelete "$PROJECT_ID"
+            echo "Restore command sent."
+          elif [ "$STATE" = "ACTIVE" ]; then
+            echo "Project already ACTIVE."
+          else
+            echo "Unexpected project state: $STATE"
+            exit 1
+          fi
+
+      - name: Wait for project to become ACTIVE
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT_ID="snowdbt-dev"
+
+          for i in {1..30}; do
+            STATE=$(gcloud projects describe "$PROJECT_ID" --format="value(lifecycleState)" 2>/dev/null || echo "NOT_FOUND")
+            echo "Attempt $i - lifecycleState: $STATE"
+
+            if [ "$STATE" = "ACTIVE" ]; then
+              echo "Project is ACTIVE."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "Project did not become ACTIVE in time."
+          exit 1
+
       - name: Terraform init
         run: |
           terraform -chdir=${{ steps.sel.outputs.dir }} init \
@@ -78,12 +131,6 @@ jobs:
 
       - name: Terraform validate
         run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
-
-      - name: Terraform apply (APIs first)
-        run: |
-          terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve \
-            -target=google_project_service.apis
-      
 
       - name: Terraform plan
         run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
