@@ -17,6 +17,13 @@ locals {
   project_id = module.project.projects_map["dev"]
 }
 
+resource "google_project_iam_member" "ci_storage_admin" {
+  project = local.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${var.ci_service_account_email}"
+
+  depends_on = [module.project]
+}
 # Bucket landing
 resource "google_storage_bucket" "landing" {
   name                        = "bck-pipeone-landing-dev"
@@ -33,7 +40,9 @@ resource "google_storage_bucket" "landing" {
     action    { type = "Delete" }
   }
 
-  depends_on = [module.project]
+  depends_on = [module.project,
+  google_project_iam_member.ci_storage_admin]
+  
 }
 
 # Bucket archive
@@ -52,7 +61,8 @@ resource "google_storage_bucket" "archive" {
     action    { type = "Delete" }
   }
 
-  depends_on = [module.project]
+  depends_on = [module.project,
+  google_project_iam_member.ci_storage_admin]
 }
 
 resource "google_storage_bucket_iam_member" "landing_admin" {
