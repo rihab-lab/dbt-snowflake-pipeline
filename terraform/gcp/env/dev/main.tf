@@ -3,7 +3,7 @@ module "project" {
   org_id             = var.org_id
   billing_account_id = var.billing_account_id
 
-  project_prefix = "snowdbt"
+  project_prefix = "snowdbt1"
   environments   = ["dev"]
 
   labels = {
