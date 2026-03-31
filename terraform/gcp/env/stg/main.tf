@@ -11,49 +11,13 @@ module "project" {
     managed_by  = "terraform"
   }
 }
+
 # On récupère l'ID du projet créé
 locals {
   project_id = module.project.projects_map["stg"]
 }
 
-# Bucket landing
-resource "google_storage_bucket" "landing" {
-  name                        = "bck-pipeone-landing-stg"
-  project                     = local.project_id
-  location                    = var.region
-  uniform_bucket_level_access = true
-
-  versioning {
-    enabled = true
-  }
-
-  lifecycle_rule {
-    condition { age = 30 }
-    action    { type = "Delete" }
-  }
-
-  depends_on = [module.project]
-}
-
-# Bucket archive
-resource "google_storage_bucket" "archive" {
-  name                        = "bck-pipeone-archive-stg"
-  project                     = local.project_id
-  location                    = var.region
-  uniform_bucket_level_access = true
-
-  versioning {
-    enabled = true
-  }
-
-  lifecycle_rule {
-    condition { age = 180 }
-    action    { type = "Delete" }
-  }
-
-  depends_on = [module.project]
-}
-
+#create landing & archive zone
 resource "google_project_iam_member" "ci_storage_admin" {
   project = local.project_id
   role    = "roles/storage.admin"
