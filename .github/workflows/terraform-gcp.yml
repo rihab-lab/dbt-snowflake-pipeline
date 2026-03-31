@@ -1,4 +1,4 @@
-name: Terraform GCP - Env
+name: Terraform GCP - Env (Auto Plan + Apply)
 
 on:
   workflow_dispatch:
@@ -7,24 +7,7 @@ on:
         description: "Target environment"
         type: choice
         required: true
-        options:
-          - dev
-          - stg
-          - prod
-      action:
-        description: "Terraform action"
-        type: choice
-        required: true
-        options:
-          - apply
-          - destroy
-      import_existing_project:
-        description: "Import existing GCP project into Terraform state before apply"
-        type: choice
-        required: true
-        options:
-          - "no"
-          - "yes"
+        options: [dev, stg, prod]
 
 permissions:
   contents: read
@@ -33,39 +16,34 @@ permissions:
 jobs:
   terraform_env:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ github.event.inputs.environment }}
 
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
-
-      # Désactive Composer pour éviter les coûts
       TF_VAR_enable_composer: "false"
 
-      # Variables Terraform
       TF_VAR_bootstrap_project_id: ${{ secrets.TF_VAR_BOOTSTRAP_PROJECT_ID }}
-      TF_VAR_org_id: ${{ secrets.TF_VAR_ORG_ID }}
-      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+      TF_VAR_org_id:               ${{ secrets.TF_VAR_ORG_ID }}
+      TF_VAR_billing_account_id:   ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
+
+      TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
       TF_VAR_ci_service_account_email: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      # Backend GCS
-      TFSTATE_BUCKET: "tfstate-bootstrap-project-487710"
-
-      # Snowflake
+      #TF_VAR_snowflake_account:   ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}-${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
-      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USERNAME }}
-      TF_VAR_snowflake_password: ${{ secrets.SVC_DBT_PASSWORD }}
-      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_user:      ${{ vars.SNOWFLAKE_USERNAME }}
+      #TF_VAR_snowflake_password:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      TF_VAR_snowflake_password:  ${{ secrets.SVC_DBT_PASSWORD }}
+      TF_VAR_snowflake_role:      ${{ vars.SNOWFLAKE_ROLE }}
       TF_VAR_snowflake_warehouse: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-      TF_VAR_snowflake_database: ${{ vars.SNOWFLAKE_DATABASE }}
-      TF_VAR_snowflake_schema: ${{ vars.SNOWFLAKE_SCHEMA }}
+      TF_VAR_snowflake_database:  ${{ vars.SNOWFLAKE_DATABASE }}
+      TF_VAR_snowflake_schema:    ${{ vars.SNOWFLAKE_SCHEMA }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.5
 
@@ -77,84 +55,38 @@ jobs:
 
       - name: Select env directory
         id: sel
-        shell: bash
         run: |
-          ENV="${{ inputs.environment }}"
-          echo "dir=terraform/gcp/env/$ENV" >> "$GITHUB_OUTPUT"
-          echo "prefix=gcp/env/$ENV" >> "$GITHUB_OUTPUT"
+          ENV="${{ github.event.inputs.environment }}"
+          echo "dir=terraform/gcp/env/$ENV" >> $GITHUB_OUTPUT
+          echo "prefix=gcp/env/$ENV" >> $GITHUB_OUTPUT
 
-      - name: Safety check for destroy on prod
-        if: inputs.action == 'destroy' && inputs.environment == 'prod'
-        shell: bash
+      - name: Debug TF vars presence
         run: |
-          echo "Destroy on prod is blocked."
-          exit 1
-
-      - name: Debug variable presence
-        shell: bash
-        run: |
-          [ -n "${TF_VAR_bootstrap_project_id}" ] && echo "bootstrap_project_id OK" || echo "bootstrap_project_id MISSING"
-          [ -n "${TF_VAR_org_id}" ] && echo "org_id OK" || echo "org_id MISSING"
-          [ -n "${TF_VAR_billing_account_id}" ] && echo "billing_account_id OK" || echo "billing_account_id MISSING"
-          [ -n "${TF_VAR_ci_service_account_email}" ] && echo "ci_service_account_email OK" || echo "ci_service_account_email MISSING"
-
-          [ -n "${TF_VAR_snowflake_account}" ] && echo "snowflake_account OK" || echo "snowflake_account MISSING"
-          [ -n "${TF_VAR_snowflake_user}" ] && echo "snowflake_user OK" || echo "snowflake_user MISSING"
-          [ -n "${TF_VAR_snowflake_password}" ] && echo "snowflake_password OK" || echo "snowflake_password MISSING"
-          [ -n "${TF_VAR_snowflake_role}" ] && echo "snowflake_role OK" || echo "snowflake_role MISSING"
-          [ -n "${TF_VAR_snowflake_warehouse}" ] && echo "snowflake_warehouse OK" || echo "snowflake_warehouse MISSING"
-          [ -n "${TF_VAR_snowflake_database}" ] && echo "snowflake_database OK" || echo "snowflake_database MISSING"
-          [ -n "${TF_VAR_snowflake_schema}" ] && echo "snowflake_schema OK" || echo "snowflake_schema MISSING"
+          [ -n "${TF_VAR_snowflake_account}" ] && echo "account OK" || echo "account MISSING"
+          [ -n "${TF_VAR_snowflake_user}" ] && echo "user OK" || echo "user MISSING"
+          [ -n "${TF_VAR_snowflake_password}" ] && echo "password OK" || echo "password MISSING"
+          [ -n "${TF_VAR_snowflake_role}" ] && echo "role OK" || echo "role MISSING"
+          [ -n "${TF_VAR_snowflake_warehouse}" ] && echo "warehouse OK" || echo "warehouse MISSING"
+          [ -n "${TF_VAR_snowflake_database}" ] && echo "database OK" || echo "database MISSING"
+          [ -n "${TF_VAR_snowflake_schema}" ] && echo "schema OK" || echo "schema MISSING"
 
       - name: Terraform init
-        shell: bash
         run: |
-          terraform -chdir="${{ steps.sel.outputs.dir }}" init \
+          terraform -chdir=${{ steps.sel.outputs.dir }} init \
             -backend-config="bucket=${TFSTATE_BUCKET}" \
             -backend-config="prefix=${{ steps.sel.outputs.prefix }}"
 
-      - name: Create temporary import.tf
-        if: inputs.action == 'apply' && inputs.import_existing_project == 'yes' && inputs.environment == 'dev'
-        shell: bash
-        run: |
-          cat > "${{ steps.sel.outputs.dir }}/import.tf" <<'EOF'
-          import {
-            to = module.project.google_project.project["dev"]
-            id = "snowdbt-dev"
-          }
-          EOF
-          echo "Temporary import.tf created"
-
-      - name: Show import.tf
-        if: inputs.action == 'apply' && inputs.import_existing_project == 'yes' && inputs.environment == 'dev'
-        shell: bash
-        run: cat "${{ steps.sel.outputs.dir }}/import.tf"
-
       - name: Terraform validate
-        if: inputs.action == 'apply'
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" validate
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} validate
 
-      - name: Terraform state list
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" state list || true
+      - name: Terraform apply (APIs first)
+        run: |
+          terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve \
+            -target=google_project_service.apis
+      
 
       - name: Terraform plan
-        if: inputs.action == 'apply'
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" plan -out=tfplan
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} plan -out=tfplan
 
       - name: Terraform apply
-        if: inputs.action == 'apply'
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" apply -auto-approve tfplan
-
-      - name: Terraform destroy plan
-        if: inputs.action == 'destroy'
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" plan -destroy -out=tfdestroy
-
-      - name: Terraform destroy
-        if: inputs.action == 'destroy'
-        shell: bash
-        run: terraform -chdir="${{ steps.sel.outputs.dir }}" apply -auto-approve tfdestroy
+        run: terraform -chdir=${{ steps.sel.outputs.dir }} apply -auto-approve tfplan
