@@ -90,7 +90,7 @@ resource "google_storage_bucket_iam_member" "archive_viewer" {
 # ------------------------------------------------------------
 resource "google_project_service" "apis" {
   for_each = toset([
-    "composer.googleapis.com",
+    #"composer.googleapis.com",
     "compute.googleapis.com",
     "storage.googleapis.com",
     "iam.googleapis.com",
@@ -106,11 +106,18 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "composer_api" {
+  count              = var.enable_composer ? 1 : 0
+  project            = local.project_id
+  service            = "composer.googleapis.com"
+  disable_on_destroy = false
+}
 # ------------------------------------------------------------
 # Cloud Composer 2 - Service Agent Extension role (OBLIGATOIRE)
 # service-<PROJECT_NUMBER>@cloudcomposer-accounts.iam.gserviceaccount.com
 # ------------------------------------------------------------
 resource "google_project_iam_member" "composer_service_agent_v2ext" {
+  count   = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/composer.ServiceAgentV2Ext"
   member  = "serviceAccount:service-${module.project.project_numbers["dev"]}@cloudcomposer-accounts.iam.gserviceaccount.com"
@@ -123,6 +130,7 @@ resource "google_project_iam_member" "composer_service_agent_v2ext" {
 # <PROJECT_NUMBER>@cloudservices.gserviceaccount.com
 # ------------------------------------------------------------
 resource "google_project_iam_member" "cloudservices_editor" {
+  count   = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/editor"
   member  = "serviceAccount:${module.project.project_numbers["dev"]}@cloudservices.gserviceaccount.com"
@@ -134,6 +142,7 @@ resource "google_project_iam_member" "cloudservices_editor" {
 # Attendre propagation IAM (évite les erreurs 400 "missing perms")
 # ------------------------------------------------------------
 resource "time_sleep" "wait_composer_iam" {
+  count   = var.enable_composer ? 1 : 0
   depends_on      = [
     google_project_iam_member.composer_service_agent_v2ext,
     google_project_iam_member.cloudservices_editor
@@ -145,6 +154,7 @@ resource "time_sleep" "wait_composer_iam" {
 # Service Account pour l'environnement Composer (workers)
 # ------------------------------------------------------------
 resource "google_service_account" "composer" {
+  count   = var.enable_composer ? 1 : 0
   project      = local.project_id
   account_id   = "sa-composer-dev"
   display_name = "Composer SA (dev)"
@@ -154,6 +164,7 @@ resource "google_service_account" "composer" {
 
 # Composer workers role (obligatoire)
 resource "google_project_iam_member" "composer_worker_role" {
+  count  = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/composer.worker"
   member  = "serviceAccount:${google_service_account.composer.email}"
@@ -165,12 +176,14 @@ resource "google_project_iam_member" "composer_worker_role" {
 # IAM buckets (landing/archive)
 # ------------------------------------------------------------
 resource "google_storage_bucket_iam_member" "landing_viewer_composer" {
+  count  = var.enable_composer ? 1 : 0
   bucket = google_storage_bucket.landing.name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.composer.email}"
 }
 
 resource "google_storage_bucket_iam_member" "archive_admin_composer" {
+  count  = var.enable_composer ? 1 : 0
   bucket = google_storage_bucket.archive.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.composer.email}"
@@ -178,6 +191,7 @@ resource "google_storage_bucket_iam_member" "archive_admin_composer" {
 
 # Optionnel : accès secrets (Snowflake/dbt) si tu utilises Secret Manager
 resource "google_project_iam_member" "composer_secret_accessor" {
+  count  = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.composer.email}"
@@ -185,6 +199,7 @@ resource "google_project_iam_member" "composer_secret_accessor" {
 
 # Accès UI Composer pour ton user (console + liste env)
 resource "google_project_iam_member" "composer_user_me" {
+  count  = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/composer.user"
   member  = "user:rihab.bahri7@rbaapp.com"
@@ -196,6 +211,7 @@ resource "google_project_iam_member" "composer_user_me" {
 # Composer Environment DEV
 # ------------------------------------------------------------
 resource "google_composer_environment" "dev" {
+  count   = var.enable_composer ? 1 : 0
   project = local.project_id
   name    = "composer-pipeone-dev"
   region  = var.region
@@ -234,7 +250,7 @@ resource "google_composer_environment" "dev" {
         cpu        = 1
         memory_gb  = 2
         storage_gb = 10
-        min_count  = 1
+        min_count  = 0
         max_count  = 2
       }
     }
@@ -244,6 +260,7 @@ resource "google_composer_environment" "dev" {
 
 # Accès Monitoring (sinon page surveillance bloquée)
 resource "google_project_iam_member" "monitoring_viewer_me" {
+  count   = var.enable_composer ? 1 : 0
   project = local.project_id
   role    = "roles/monitoring.viewer"
   member  = "user:rihab.bahri7@rbaapp.com"
@@ -253,6 +270,7 @@ resource "google_project_iam_member" "monitoring_viewer_me" {
 
 # Accès à ton user pour lire/voir les DAGs dans le bucket Composer
 resource "google_storage_bucket_iam_member" "composer_bucket_viewer_me" {
+  count   = var.enable_composer ? 1 : 0
   bucket = "europe-west1-composer-pipeo-f6eee988-bucket"
   role   = "roles/storage.objectViewer"
   member = "user:rihab.bahri7@rbaapp.com"
@@ -260,6 +278,7 @@ resource "google_storage_bucket_iam_member" "composer_bucket_viewer_me" {
 
 # Pour uploader/modifier les DAGs (recommandé si tu veux déposer des fichiers)
 resource "google_storage_bucket_iam_member" "composer_bucket_admin_me" {
+  count   = var.enable_composer ? 1 : 0
   bucket = "europe-west1-composer-pipeo-f6eee988-bucket"
   role   = "roles/storage.objectAdmin"
   member = "user:rihab.bahri7@rbaapp.com"

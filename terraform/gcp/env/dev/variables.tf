@@ -44,3 +44,8 @@ variable "snowflake_schema" {
   type      = string
   sensitive = true
 }
+
+variable "enable_composer" {
+  type    = bool
+  default = true
+}
