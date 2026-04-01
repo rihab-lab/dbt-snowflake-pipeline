@@ -137,7 +137,7 @@ resource "google_project_iam_member" "dbt_job_secret_accessor" {
   member  = "serviceAccount:${google_service_account.dbt_job_sa.email}"
 }
 
-#new one 
+/*
 resource "google_project_iam_member" "cloud_run_viewer_me" {
   project = local.project_id
   role    = "roles/run.viewer"
@@ -229,4 +229,4 @@ resource "google_cloud_run_v2_job" "dbt_run_dev" {
     google_project_iam_member.dbt_job_secret_accessor,
     google_secret_manager_secret_version.snowflake_versions
   ]
-}
+}*/
