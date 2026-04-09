@@ -45,7 +45,23 @@ resource "google_storage_bucket" "landing" {
   google_project_iam_member.ci_storage_admin]
   
 }
+#folders per domaine
+locals {
+  landing_prefixes = [
+    "prc_benchmark",
+    "prc_campaign"
+  ]
+}
 
+resource "google_storage_bucket_object" "landing_folders" {
+  for_each = toset(local.landing_prefixes)
+
+  name    = "${each.value}/"
+  bucket  = google_storage_bucket.landing.name
+  content = ""
+
+  depends_on = [google_storage_bucket.landing]
+}
 # Bucket archive
 resource "google_storage_bucket" "archive" {
   name                        = "bck-pipeone-archive-dev"
