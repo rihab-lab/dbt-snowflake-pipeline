@@ -40,7 +40,7 @@ resource "google_storage_bucket" "landing" {
     condition { age = 30 }
     action    { type = "Delete" }
   }
-
+landing_prefixes
   depends_on = [module.project,
   google_project_iam_member.ci_storage_admin]
   
