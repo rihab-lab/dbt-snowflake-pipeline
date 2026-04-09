@@ -61,6 +61,12 @@ resource "google_storage_bucket_object" "landing_folders" {
 
   depends_on = [google_storage_bucket.landing]
 }
+#Pou gérer les objets
+resource "google_storage_bucket_iam_member" "rihab_object_admin" {
+  bucket = "bck-pipeone-landing-dev"
+  role   = "roles/storage.objectAdmin"
+  member = "user:rihab.bahri7@rbaapp.com"
+}
 # Bucket archive
 resource "google_storage_bucket" "archive" {
   name                        = "bck-pipeone-archive-dev"
