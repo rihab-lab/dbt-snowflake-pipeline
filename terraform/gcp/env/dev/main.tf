@@ -57,7 +57,7 @@ resource "google_storage_bucket_object" "landing_folders" {
 
   name    = "${each.value}/"
   bucket  = google_storage_bucket.landing.name
-  content = ""
+  content = " "
 
   depends_on = [google_storage_bucket.landing]
 }
