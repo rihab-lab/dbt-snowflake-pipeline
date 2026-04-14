@@ -25,7 +25,7 @@ jobs:
       TF_VAR_snowflake_account_name:      ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_username:          ${{ secrets.SNOWFLAKE_USERNAME }}
       #TF_VAR_snowflake_password:          ${{ secrets.SNOWFLAKE_PASSWORD }}
-      TF_VAR_snowflake_password:          ${{ secrets.SNOW_PWD }}
+      TF_VAR_snow_pwd:          ${{ secrets.SNOW_PWD }}
       TF_VAR_svc_dbt_password:            ${{ secrets.SVC_DBT_PASSWORD }}
 
     steps:
@@ -49,7 +49,7 @@ jobs:
           test -n "${TF_VAR_snowflake_organization_name}" || (echo "Missing SNOWFLAKE_ORGANIZATION_NAME" && exit 1)
           test -n "${TF_VAR_snowflake_account_name}"      || (echo "Missing SNOWFLAKE_ACCOUNT_NAME" && exit 1)
           test -n "${TF_VAR_snowflake_username}"          || (echo "Missing SNOWFLAKE_USERNAME" && exit 1)
-          test -n "${TF_VAR_snowflake_password}"          || (echo "Missing SNOWFLAKE_PASSWORD" && exit 1)
+          test -n "${TF_VAR_snow_pwd}"          || (echo "Missing SNOWFLAKE_PASSWORD" && exit 1)
           test -n "${TF_VAR_svc_dbt_password}"            || (echo "Missing SVC_DBT_PASSWORD" && exit 1)
 
       # ✅ FMT CHECK (ne modifie rien, échoue si non formaté)
