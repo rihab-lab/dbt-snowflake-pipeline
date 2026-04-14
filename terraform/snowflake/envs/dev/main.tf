@@ -33,9 +33,9 @@ resource "snowflake_file_format" "csv_format" {
 
   format_type = "CSV"
 
-  skip_header = 1
+  skip_header                  = 1
   field_optionally_enclosed_by = "\""
-  null_if = ["NULL", "null", ""]
+  null_if                      = ["NULL", "null", ""]
 }
 resource "snowflake_stage" "gcp_stage" {
   name     = "EXTERNAL_GCP_STAGE_STORAGE"
