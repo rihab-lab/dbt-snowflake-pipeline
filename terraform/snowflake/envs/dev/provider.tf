@@ -7,16 +7,16 @@ terraform {
   }
 }
 
-/*provider "snowflake" {
+provider "snowflake" {
   organization_name = var.snowflake_organization_name
   account_name      = var.snowflake_account_name
 
   user     = var.snowflake_username
   password = var.snowflake_password
   role     = "ACCOUNTADMIN"
-}*/
+}
 
-provider "snowflake" {
+/*provider "snowflake" {
   organization_name = var.snowflake_organization_name
   account_name      = var.snowflake_account_name
 
@@ -24,4 +24,4 @@ provider "snowflake" {
   password = var.snow_pwd
 
   role = "ACCOUNTADMIN"
-}
+}*/
