@@ -5,6 +5,10 @@ variable "snowflake_password" {
   type      = string
   sensitive = true
 }
+variable "snow_pwd" {
+  type      = string
+  sensitive = true
+}
 
 variable "svc_dbt_password" {
   type      = string

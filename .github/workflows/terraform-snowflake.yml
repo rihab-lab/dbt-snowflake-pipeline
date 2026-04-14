@@ -24,7 +24,8 @@ jobs:
       TF_VAR_snowflake_organization_name: ${{ secrets.SNOWFLAKE_ORGANIZATION_NAME }}
       TF_VAR_snowflake_account_name:      ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
       TF_VAR_snowflake_username:          ${{ secrets.SNOWFLAKE_USERNAME }}
-      TF_VAR_snowflake_password:          ${{ secrets.SNOWFLAKE_PASSWORD }}
+      #TF_VAR_snowflake_password:          ${{ secrets.SNOWFLAKE_PASSWORD }}
+      TF_VAR_snowflake_password:          ${{ secrets.SNOW_PWD }}
       TF_VAR_svc_dbt_password:            ${{ secrets.SVC_DBT_PASSWORD }}
 
     steps:
